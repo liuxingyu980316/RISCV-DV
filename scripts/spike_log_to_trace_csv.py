@@ -91,7 +91,7 @@ def read_spike_instr(match, full_trace):    # 将正则表达式匹配后的对�
     return instr
 
 
-def read_spike_trace(path, full_trace):
+def read_spike_trace(path, full_trace):   #目的：从Spike模拟器的日志文件中读取指令
     """Read a Spike simulation log at <path>, yielding executed instructions.
 
     This assumes that the log was generated with the -l and --log-commits options
@@ -109,6 +109,11 @@ def read_spike_trace(path, full_trace):
     (entry, illegal). entry is a RiscvInstructionTraceEntry. illegal is a
     boolean, which is true if the instruction caused an illegal instruction trap.
 
+    这个模拟器模拟了一种叫做RISC-V的硬件的行为，那么这个日志会告诉你哪些指令被执行了。这就像是你在做一道菜，然后记录下了每一步的做法。
+    这个日志里有很多的信息，包括每一步做了什么，以及是否有错误发生。如果你想知道每一步的详细信息，比如用了哪些原料，那么你就需要打开"full_trace"这个选项。
+    但是，因为Spike在开始的时候运行了一些特殊的步骤，所以我们不需要关心这些步骤。我们只需要从0x1010这个地方开始看就行了。这就像是你在看一个食谱，但是你只需要从"准备原料"这一步开始看。
+    最后，如果一个指令导致了错误，我们就知道这个指令是非法的，我们会在结果中标记出来。这样就像是你在看一个食谱，如果发现某一步做不了，你就会在这一步旁边打个问号。
+
     """
 
     # This loop is a simple FSM with states TRAMPOLINE, INSTR, EFFECT. The idea
@@ -124,27 +129,27 @@ def read_spike_trace(path, full_trace):
     # true. Otherwise, we are in state EFFECT if instr is not None, otherwise we
     # are in state INSTR.
 
-    end_trampoline_re = re.compile(r'core.*: 0x0*1010 ')
+    end_trampoline_re = re.compile(r'core.*: 0x0*1010 ')     #定义了一个正则表达式，用于匹配需要关心的起点：即0X1010
 
-    in_trampoline = True
-    instr = None
+    in_trampoline = True     # 默认需要跳过
+    instr = None     # 初始化一个变量，用于存储当前正在处理的指令
 
-    with open(path, 'r') as handle:
-        for line in handle:
-            if in_trampoline:
-                # The TRAMPOLINE state
-                if end_trampoline_re.match(line):
+    with open(path, 'r') as handle:     #  根据PATH以只读模式打开spike日志文件
+        for line in handle:             
+            if in_trampoline:           #  当需要跳过的时候
+                # The TRAMPOLINE state   
+                if end_trampoline_re.match(line):   
                     in_trampoline = False
-                continue
+                continue                # 匹配每一行，直到匹配到OX1010，才进行下面的if语句
 
-            if instr is None:
+            if instr is None: 
                 # The INSTR state. We expect to see a line matching CORE_RE.
                 # We'll discard any other lines.
-                instr_match = CORE_RE.match(line)
+                instr_match = CORE_RE.match(line)  #提取的信息包括：地址（addr）、二进制表示（bin）和指令（instr）
                 if not instr_match:
                     continue
 
-                instr = read_spike_instr(instr_match, full_trace)
+                instr = read_spike_instr(instr_match, full_trace)   #将提取到的信息转换成CSV 
 
                 # If instr.instr_str is 'ecall', we should stop.
                 if instr.instr_str == 'ecall':
@@ -175,7 +180,7 @@ def read_spike_trace(path, full_trace):
             # the --log-commits Spike option)?
             commit_match = RD_RE.match(line)
             if commit_match:
-                groups = commit_match.groupdict()
+                groups = commit_match.groupdict()     #存到字典中
                 instr.gpr.append(gpr_to_abi(groups["reg"].replace(' ', '')) +
                                  ":" + groups["val"])
 
