@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 Convert spike sim log to standard riscv instruction trace format
+将spike 模拟器日志转化为标准的RISCV指令跟踪格式：这种格式包含了一系列的标准字段，如指令地址、操作码、操作数等，可以方便地进行指令级别的分析和调试
 """
 
 import argparse
@@ -22,71 +23,70 @@ import re
 import sys
 import logging
 
-sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))    #这行代码的目的是将当前正在执行的Python脚本所在的目录添加到Python解释器的模块搜索路径中，并且让它成为第一个搜索的目录。这样，就可以在当前目录下导入其他Python模块。
 
 from riscv_trace_csv import *
 from lib import *
 
-RD_RE = re.compile(
+RD_RE = re.compile(       #它提取的信息包括：优先级（pri）、地址（addr）、二进制表示（bin）、寄存器（reg）、值（val）、控制状态寄存器（csr）和控制状态寄存器的值（csr_val）
     r"(core\s+\d+:\s+)?(?P<pri>\d)\s+0x(?P<addr>[a-f0-9]+?)\s+" \
     r"\((?P<bin>.*?)\)\s+(?P<reg>[xf]\s*\d*?)\s+0x(?P<val>[a-f0-9]+)" \
     r"(\s+(?P<csr>\S+)\s+0x(?P<csr_val>[a-f0-9]+))?")
-CORE_RE = re.compile(
+CORE_RE = re.compile(    #它提取的信息包括：地址（addr）、二进制表示（bin）和指令（instr）
     r"core\s+\d+:\s+0x(?P<addr>[a-f0-9]+?)\s+\(0x(?P<bin>.*?)\)\s+(?P<instr>.*?)$")
-ADDR_RE = re.compile(
+ADDR_RE = re.compile(    #它提取的信息包括：寄存器（rd）、立即数（imm）和寄存器（rs1）
     r"(?P<rd>[a-z0-9]+?),(?P<imm>[\-0-9]+?)\((?P<rs1>[a-z0-9]+)\)")
-ILLE_RE = re.compile(r"trap_illegal_instruction")
+ILLE_RE = re.compile(r"trap_illegal_instruction") #它提取的信息包括：非法指令
 
-LOGGER = logging.getLogger()
+LOGGER = logging.getLogger()    #创建或者获取一个”root“的日志记录器
 
 
-def process_instr(trace):
+def process_instr(trace):    #目的：将一个指令的操作数转化为CSV格式
     if trace.instr == "jal":
-        # Spike jal format jal rd, -0xf -> jal rd, -15
-        idx = trace.operand.rfind(",")
-        imm = trace.operand[idx + 1:]
-        if imm[0] == "-":
-            imm = "-" + str(int(imm[1:], 16))
+        # Spike jal format jal rd, -0xf -> jal rd, -15     jump and link 指令
+        idx = trace.operand.rfind(",")   # 在trace对象的operand 中找到最后一个逗号的位置，赋值给idx 例如x10,0x1234(x11) “7”
+        imm = trace.operand[idx + 1:] #从最后一个逗号开始，提取出立即数
+        if imm[0] == "-":   #判断立即数的第一个字符是否为 “-”
+            imm = "-" + str(int(imm[1:], 16))   #如果立即数是负数，将其转换为十进制整数，并保留负号。
         else:
-            imm = str(int(imm, 16))
-        trace.operand = trace.operand[0:idx + 1] + imm
+            imm = str(int(imm, 16))  #将立即数转换为十进制整数，并转换为字符串类型
+        trace.operand = trace.operand[0:idx + 1] + imm    #将处理后的立即数重新组合到operand属性中，替换原来的operand部分。
     # Properly format operands of all instructions of the form:
     # <instr> <reg1> <imm>(<reg2>)
     # The operands should be converted into CSV as:
     # "<reg1>,<reg2>,<imm>"
-    m = ADDR_RE.search(trace.operand)
+    m = ADDR_RE.search(trace.operand)  #使用寄存器（rd）、立即数（imm）和寄存器（rs1） 进行匹配
     if m:
-        trace.operand = "{},{},{}".format(
+        trace.operand = "{},{},{}".format(   #匹配成功，则用， ， ， 的CSV格式替换原来的operand格式
             m.group("rd"), m.group("rs1"), m.group("imm"))
 
 
-def read_spike_instr(match, full_trace):
+def read_spike_instr(match, full_trace):    # 将正则表达式匹配后的对象 解析为一个RiscvInstructionTraceEntry对象，包含了指令的各种属性，如程序计数器 PC 指令字符串 二进制表示等
     """Unpack a regex match for CORE_RE to a RiscvInstructionTraceEntry
 
-    If full_trace is true, extract operand data from the disassembled
-    instruction.
+    If full_trace is true, extract operand data from the disassembled instruction.
 
     """
 
     # Extract the disassembled instruction.
-    disasm = match.group('instr')
+    disasm = match.group('instr')          #从正则表达式匹配的对象match中的instr组的结果给disasm， instr的使用例子见61行：m.group("rd"), m.group("rs1"), m.group("imm"))
 
-    # Spike's disassembler shows a relative jump as something like "j pc +
-    # 0x123" or "j pc - 0x123". We just want the relative offset.
-    disasm = disasm.replace('pc + ', '').replace('pc - ', '-')
+    # Spike's disassembler shows a relative jump as something like "j pc + 0x123" or "j pc - 0x123". We just want the relative offset.
+    disasm = disasm.replace('pc + ', '').replace('pc - ', '-')   #对反汇编后的指令字符串进行处理，将"pc + "替换为空字符串，将"pc - "替换为-。这是为了处理Spike模拟器中相对跳转指令的特殊表示方式
 
-    instr = RiscvInstructionTraceEntry()
+    instr = RiscvInstructionTraceEntry()     #从match的正则表达式中把对应的部分提取到RiscvInstructionTraceEntry instr变量中
     instr.pc = match.group('addr')
     instr.instr_str = disasm
     instr.binary = match.group('bin')
 
-    if full_trace:
-        opcode = disasm.split(' ')[0]
-        operand = disasm[len(opcode):].replace(' ', '')
+    if full_trace:   #full_trace为True时，可以从反汇编的指令中提取出更详细的信息，包括操作数数据，以便进行更复杂的数据处理和分析。而如果full_trace为False，则只会提取基本的指令跟踪信息，不会处理操作数数据。
+        opcode = disasm.split(' ')[0]   #将反汇编指令字符串（disasm）按空格分割，并取第一个分割结果作为操作码（opcode）例：disasm的值为"addi x1, x2, 123"，其中"addi"是操作码，"x1, x2, 123"是操作数。
+                                        #调用disasm.split(' ')会将字符串按空格分割成["addi", "x1,", "x2,", "123"]的列表。然后，通过索引列表的第一个元素，即[0]，可以提取出操作码"addi"
+        operand = disasm[len(opcode):].replace(' ', '')  #len(opcode)会返回addi操作码的长度为4，然后使用切片操作disasm[4:]可以提取出操作数部分"x1, x2, 123"。 再删掉空格
         instr.instr, instr.operand = \
-            convert_pseudo_instr(opcode, operand, instr.binary)
+            convert_pseudo_instr(opcode, operand, instr.binary) #利用convert_pseudo_instr 函数将结果给instr的instr 和 operand
 
-        process_instr(instr)
+        process_instr(instr) #调用前序函数对信息进行处理和CSV化
 
     return instr
 
