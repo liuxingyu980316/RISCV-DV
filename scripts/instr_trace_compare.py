@@ -26,12 +26,12 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from riscv_trace_csv import *
 
 
-def compare_trace_csv(csv1, csv2, name1, name2, log,
-                      in_order_mode=1,
-                      coalescing_limit=0,
-                      verbose=0,
-                      mismatch_print_limit=5,
-                      compare_final_value_only=0):
+def compare_trace_csv(csv1, csv2, name1, name2, log,    #用于比较两个 RISC-V 指令跟踪的 CSV 文件
+                      in_order_mode=1,       # 一个布尔值，表示是否启用按顺序比较模式。如果启用，函数将按照指令的顺序逐行比较 CSV 文件。
+                      coalescing_limit=0，   # 一个整数，表示合并限制。如果两个 CSV 文件中的指令顺序不同，但在一定范围内（由该参数指定），则视为匹配。默认值为 0（禁用合并）。
+                      verbose=0,            # 一个布尔值，表示是否启用详细输出。如果启用，函数将输出更多关于比较结果的信息。默认值为 0（禁用）。
+                      mismatch_print_limit=5,    # 一个整数，表示不匹配的打印限制。如果比较过程中发现不匹配的行数超过该参数指定的值，函数将停止输出不匹配的行。默认值为 5。
+                      compare_final_value_only=0): # 一个布尔值，表示是否只比较最终值。如果启用，函数将只比较 CSV 文件中的最后一行（即最终值），忽略之前的所有行。默认值为 0（禁用）
     """Compare two trace CSV file"""
     matched_cnt = 0
     mismatch_cnt = 0
@@ -231,8 +231,10 @@ def compare_trace_csv(csv1, csv2, name1, name2, log,
 #      prev_val[trace.rd] = trace.rd_val
 
 
-def check_update_gpr(gpr_update, gpr):
-    gpr_state_change = 0
+def check_update_gpr(gpr_update, gpr):   # 用于检查并更新通用寄存器（GPR）的状态  
+                                         # gpr_update字符串列表，表示要更新的通用寄存器的状态。每个字符串的格式为 "rd:rd_val"，其中 rd 是寄存器的名称，rd_val 是寄存器的值。
+                                         # gpr：一个字典，表示当前通用寄存器的状态。字典的键是寄存器的名称，值是寄存器的值。
+    gpr_state_change = 0                 # 用于记录通用寄存器的状态是否发生了变化。初始值为 0，表示没有变化。
     for update in gpr_update:
         if update == "":
             return 0
@@ -245,7 +247,7 @@ def check_update_gpr(gpr_update, gpr):
             if rd_val != gpr[rd]:
                 gpr_state_change = 1
         else:
-            if int(rd_val, 16) != 0:
+            if int(rd_val, 16) != 0:    # 如果寄存器不存在于 gpr 字典中，它将检查更新后的寄存器值 rd_val 是否不为 0（以十六进制解析）。如果不为 0，说明新增了一个非零值的寄存器，将 gpr_state_change 设置为 1。
                 gpr_state_change = 1
         gpr[rd] = rd_val
     return gpr_state_change
@@ -253,7 +255,7 @@ def check_update_gpr(gpr_update, gpr):
 
 def main():
     # Parse input arguments
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()        # 设置一些参数，便于比较
     parser.add_argument("--csv_file_1", type=str,
                         help="Instruction trace 1 CSV")
     parser.add_argument("--csv_file_2", type=str,
