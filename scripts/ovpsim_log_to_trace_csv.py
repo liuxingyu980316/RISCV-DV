@@ -15,6 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 Convert ovpsim sim log to standard riscv-dv .csv instruction trace format
+一种模拟器
 """
 import re
 import os
