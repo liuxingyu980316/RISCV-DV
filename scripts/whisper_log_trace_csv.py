@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 Convert whisper sim log to standard riscv instruction trace format
+一种模拟器
 """
 
 import argparse
