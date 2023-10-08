@@ -88,7 +88,7 @@ def get_generator_cmd(simulator, simulator_yaml, cov, exp, debug_cmd):   #设置
                        generator
     """
     logging.info("Processing simulator setup file : {}".format(simulator_yaml))
-    yaml_data = read_yaml(simulator_yaml)
+    yaml_data = read_yaml(simulator_yaml)        #  目的：解析YAML文件并解析为Python字典
     # Search for matched simulator
     for entry in yaml_data:
         if entry['tool'] == simulator:
