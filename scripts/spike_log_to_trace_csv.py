@@ -181,20 +181,20 @@ def read_spike_trace(path, full_trace):   #目的：从Spike模拟器的日志�
             commit_match = RD_RE.match(line)
             if commit_match:
                 groups = commit_match.groupdict()     #存到字典中
-                instr.gpr.append(gpr_to_abi(groups["reg"].replace(' ', '')) +
+                instr.gpr.append(gpr_to_abi(groups["reg"].replace(' ', '')) +   # 从匹配结果中提取通用寄存器的值和CSR（控制和状态寄存器）的值，并将它们添加到instr对象的gpr属性中
                                  ":" + groups["val"])
 
                 if groups["csr"] and groups["csr_val"]:
-                    instr.csr.append(groups["csr"] + ":" + groups["csr_val"])
+                    instr.csr.append(groups["csr"] + ":" + groups["csr_val"])   # 将CSR的名称和值添加到instr对象的csr属性中。
 
-                instr.mode = commit_match.group('pri')
+                instr.mode = commit_match.group('pri')     # 从匹配结果中提取优先级（'pri'）并将其赋值给instr对象的mode属性。
 
         # At EOF, we might have an instruction in hand. Yield it if so.
         if instr is not None:
             yield (instr, False)
 
 
-def process_spike_sim_log(spike_log, csv, full_trace=0):
+def process_spike_sim_log(spike_log, csv, full_trace=0):    # 处理spike模拟日志文件，提取指令和受影响的寄存器信息，并将结果写入CSV文件
     """Process SPIKE simulation log.
 
     Extract instruction and affected register information from spike simulation
@@ -202,18 +202,18 @@ def process_spike_sim_log(spike_log, csv, full_trace=0):
     instructions written.
 
     """
-    logging.info("Processing spike log : {}".format(spike_log))
-    instrs_in = 0
-    instrs_out = 0
+    logging.info("Processing spike log : {}".format(spike_log))   # 打印消息
+    instrs_in = 0     # 读取的指令
+    instrs_out = 0    # 写出的指令
 
-    with open(csv, "w") as csv_fd:
-        trace_csv = RiscvInstructionTraceCsv(csv_fd)
-        trace_csv.start_new_trace()
+    with open(csv, "w") as csv_fd:   # 打开待写入的CSV文件
+        trace_csv = RiscvInstructionTraceCsv(csv_fd)     对CSV文件进行处理，待补充
+        trace_csv.start_new_trace()   
 
-        for (entry, illegal) in read_spike_trace(spike_log, full_trace):
-            instrs_in += 1
+        for (entry, illegal) in read_spike_trace(spike_log, full_trace):   # 从spike日志中读instr：entry 和是否非法
+            instrs_in += 1   #读到的指令+1
 
-            if illegal and full_trace:
+            if illegal and full_trace:    #非法指令 且 full_trace ，则输出一个消息
                 logging.debug("Illegal instruction: {}, opcode:{}"
                               .format(entry.instr_str, entry.binary))
 
@@ -223,35 +223,36 @@ def process_spike_sim_log(spike_log, csv, full_trace=0):
             # We say that an instruction caused an architectural update if either we
             # saw a commit line (in which case, entry.gpr will contain a single
             # entry) or the instruction was 'wfi' or 'ecall'.
-            if not (full_trace or entry.gpr or entry.instr_str in ['wfi',
+            if not (full_trace or entry.gpr or entry.instr_str in ['wfi',          #full_trace参数为False，并且指令没有通用寄存器的更新（即entry.gpr为空），并且指令不是'wfi'或'ecall'，就跳过当前指令
                                                                    'ecall']):
                 continue
 
-            trace_csv.write_trace_entry(entry)
-            instrs_out += 1
+            trace_csv.write_trace_entry(entry)      #调用 instr的方法，将当前指令写入CSV文件
+            instrs_out += 1    # 写出+1 
 
-    logging.info("Processed instruction count : {}".format(instrs_in))
+    logging.info("Processed instruction count : {}".format(instrs_in))  #打印消息
     logging.info("CSV saved to : {}".format(csv))
     return instrs_out
 
 
 def main():
-    # Parse input arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--log", type=str, help="Input spike simulation log")
-    parser.add_argument("--csv", type=str, help="Output trace csv_buf file")
-    parser.add_argument("-f", "--full_trace", dest="full_trace",
+    # Parse input arguments  
+    parser = argparse.ArgumentParser()   # 使用argparse模块创建一个命令行参数解析器对象，python的方法。接着，使用add_argument方法添加几个命令行参数：
+    parser.add_argument("--log", type=str, help="Input spike simulation log")     # 输入的SPIKE模拟器日志文件的路径。
+    parser.add_argument("--csv", type=str, help="Output trace csv_buf file")   # 输出的跟踪CSV文件的路径。
+    parser.add_argument("-f", "--full_trace", dest="full_trace",    # 一个可选的标志，用于指示是否需要生成完整的跟踪信息。默认值为False。
                         action="store_true",
                         help="Generate the full trace")
-    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
+    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",   #一个可选的标志，用于启用详细的日志记录。默认值为False。
                         help="Verbose logging")
     parser.set_defaults(full_trace=False)
     parser.set_defaults(verbose=False)
-    args = parser.parse_args()
-    setup_logging(args.verbose)
+     
+    args = parser.parse_args()   # 调用parse_args方法解析命令行参数，并将结果存储在args变量中。
+    setup_logging(args.verbose)   # lib.py 中 目的：用于设置日志的记录，根据verbose选择这个日志是DEBUG的还是INFO
     # Process spike log
-    process_spike_sim_log(args.log, args.csv, args.full_trace)
+    process_spike_sim_log(args.log, args.csv, args.full_trace)   # 传入解析出的命令行参数来处理SPIKE模拟器的日志文件
 
 
 if __name__ == "__main__":
-    main()
+    main()    # 这是Python程序的一个常见模式。当这个脚本被直接运行时，而不是作为模块导入时，它会执行main函数。这样，这个脚本既可以作为独立的程序运行，也可以被其他脚本导入并使用其中的函数。
