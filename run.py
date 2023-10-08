@@ -88,7 +88,7 @@ def get_generator_cmd(simulator, simulator_yaml, cov, exp, debug_cmd):   #设置
                        generator
     """
     logging.info("Processing simulator setup file : {}".format(simulator_yaml))
-    yaml_data = read_yaml(simulator_yaml)        #  目的：解析YAML文件并解析为Python字典
+    yaml_data = read_yaml(simulator_yaml)
     # Search for matched simulator
     for entry in yaml_data:
         if entry['tool'] == simulator:
@@ -96,25 +96,25 @@ def get_generator_cmd(simulator, simulator_yaml, cov, exp, debug_cmd):   #设置
             if simulator == "pyflow":
                 compile_cmd = ""
             else:
-                compile_spec = entry['compile']
-                compile_cmd = compile_spec['cmd']
+                compile_spec = entry['compile']   # 获取编译的spec
+                compile_cmd = compile_spec['cmd']  # 获取编译的配置
                 for i in range(len(compile_cmd)):
-                    if ('cov_opts' in compile_spec) and cov:
+                    if ('cov_opts' in compile_spec) and cov:     #如果有覆盖率的收集，则将<cov_opts> 用cov_opts后的值替换
                         compile_cmd[i] = re.sub('<cov_opts>', compile_spec[
                             'cov_opts'].rstrip(), compile_cmd[i])
                     else:
                         compile_cmd[i] = re.sub('<cov_opts>', '',
                                                 compile_cmd[i])
                     if exp:
-                        compile_cmd[i] += " +define+EXPERIMENTAL "
-            sim_cmd = entry['sim']['cmd']
+                        compile_cmd[i] += " +define+EXPERIMENTAL "   # 实验版本的配置
+            sim_cmd = entry['sim']['cmd']          #从 entry 的 sim 中 获取 cmd字段
             if ('cov_opts' in entry['sim']) and cov:
                 sim_cmd = re.sub('<cov_opts>',
-                                 entry['sim']['cov_opts'].rstrip(), sim_cmd)
+                                 entry['sim']['cov_opts'].rstrip(), sim_cmd)   # 依旧是进行的覆盖率配置替换
             else:
-                sim_cmd = re.sub('<cov_opts>', '', sim_cmd)
+                sim_cmd = re.sub('<cov_opts>', '', sim_cmd)    
             if 'env_var' in entry:
-                for env_var in entry['env_var'].split(','):
+                for env_var in entry['env_var'].split(','):        #用 env_var 替换 env_var的部分
                     for i in range(len(compile_cmd)):
                         compile_cmd[i] = re.sub(
                             "<" + env_var + ">", get_env_var(env_var, debug_cmd=debug_cmd),
@@ -127,25 +127,25 @@ def get_generator_cmd(simulator, simulator_yaml, cov, exp, debug_cmd):   #设置
     sys.exit(RET_FAIL)
 
 
-def parse_iss_yaml(iss, iss_yaml, isa, setting_dir, debug_cmd):
+def parse_iss_yaml(iss, iss_yaml, isa, setting_dir, debug_cmd):    # 解析ISS（Instruction Set Simulator，指令集模拟器）的YAML配置文件，以获取模拟命令
     """Parse ISS YAML to get the simulation command
 
     Args:
-      iss         : target ISS used to look up in ISS YAML
-      iss_yaml    : ISS configuration file in YAML format
-      isa         : ISA variant passed to the ISS
-      setting_dir : Generator setting directory
-      debug_cmd   : Produce the debug cmd log without running
+      iss         : target ISS used to look up in ISS YAML     # 模拟器的种类
+      iss_yaml    : ISS configuration file in YAML format      # 模拟器配置的路径
+      isa         : ISA variant passed to the ISS   # 传递给ISS 的isa指令集
+      setting_dir : Generator setting directory   # 生成器设置目录
+      debug_cmd   : Produce the debug cmd log without running # 用于生成调试命令日志而不执行
 
     Returns:
-      cmd         : ISS run command
+      cmd         : ISS run command   # iss 的运行指令
     """
     logging.info("Processing ISS setup file : {}".format(iss_yaml))
-    yaml_data = read_yaml(iss_yaml)
+    yaml_data = read_yaml(iss_yaml)   # 读取iss的 文档
 
     # Path to the "scripts" subdirectory
     my_path = os.path.dirname(os.path.realpath(__file__))
-    scripts_dir = os.path.join(my_path, "scripts")   # Search for matched ISS
+    scripts_dir = os.path.join(my_path, "scripts")   # Search for matched ISS   # 获取当前脚本文件所在的目录的绝对路径，并找到该目录下的"scripts"子目录的绝对路径
 
     # Search for matched ISS
     for entry in yaml_data:
@@ -153,14 +153,14 @@ def parse_iss_yaml(iss, iss_yaml, isa, setting_dir, debug_cmd):
             logging.info("Found matching ISS: {}".format(entry['iss']))
             cmd = entry['cmd'].rstrip()
             cmd = re.sub("\<path_var\>",
-                         get_env_var(entry['path_var'], debug_cmd=debug_cmd),
+                         get_env_var(entry['path_var'], debug_cmd=debug_cmd),   # 通过get_env_var将当前的环境变量传入配置文件
                          cmd)
-            m = re.search(r"rv(?P<xlen>[0-9]+?)(?P<variant>[a-zA-Z_]+?)$", isa)
+            m = re.search(r"rv(?P<xlen>[0-9]+?)(?P<variant>[a-zA-Z_]+?)$", isa)  # 搜索RV数字字母的 指令集的文件 在target目录中
             if m:
-                cmd = re.sub("\<xlen\>", m.group('xlen'), cmd)
+                cmd = re.sub("\<xlen\>", m.group('xlen'), cmd)    # 把RV之后的数字替换
             else:
-                logging.error("Illegal ISA {}".format(isa))
-            if iss == "ovpsim":
+                logging.error("Illegal ISA {}".format(isa))   # 没有的话就报错
+            if iss == "ovpsim":      
                 cmd = re.sub("\<cfg_path\>", setting_dir, cmd)
             elif iss == "whisper":
                 if m:
@@ -186,44 +186,44 @@ def get_iss_cmd(base_cmd, elf, log):
     Returns:
       cmd      : Command for ISS simulation
     """
-    cmd = re.sub("\<elf\>", elf, base_cmd)
-    cmd += (" &> {}".format(log))
+    cmd = re.sub("\<elf\>", elf, base_cmd)   # 将base_cmd 中的 <elf> 替换为传入的 elf
+    cmd += (" &> {}".format(log))  形成 base_cmd + log 的 字符串
     return cmd
 
 
-def do_compile(compile_cmd, test_list, core_setting_dir, cwd, ext_dir,
+def do_compile(compile_cmd, test_list, core_setting_dir, cwd, ext_dir,    # 编译随机指令生成器
                cmp_opts, output_dir, debug_cmd, lsf_cmd):
     """Compile the instruction generator
 
     Args:
-      compile_cmd         : Compile command for the generator
-      test_list           : List of assembly programs to be compiled
-      core_setting_dir    : Path for riscv_core_setting.sv
-      cwd                 : Filesystem path to RISCV-DV repo
-      ext_dir             : User extension directory
-      cmp_opts            : Compile options for the generator
-      output_dir          : Output directory of the ELF files
-      debug_cmd           : Produce the debug cmd log without running
-      lsf_cmd             : LSF command used to run the instruction generator
+      compile_cmd         : Compile command for the generator          编译指令生成器的命令。
+      test_list           : List of assembly programs to be compiled   要编译的汇编程序列表。
+      core_setting_dir    : Path for riscv_core_setting.sv             riscv_core_setting.sv文件的路径。
+      cwd                 : Filesystem path to RISCV-DV repo           RISCV-DV仓库的文件系统路径
+      ext_dir             : User extension directory                   用户扩展目录
+      cmp_opts            : Compile options for the generator          编译指令生成器的选项
+      output_dir          : Output directory of the ELF files          ELF文件的输出目录
+      debug_cmd           : Produce the debug cmd log without running  用于在不运行的情况下生成调试命令日志的参数
+      lsf_cmd             : LSF command used to run the instruction generator   用于运行指令生成器的LSF命令
     """
-    if not ((len(test_list) == 1) and (
+    if not ((len(test_list) == 1) and (                                # test_list 的长度不为1 且第一个不是riscv_csr_test
             test_list[0]['test'] == 'riscv_csr_test')):
-        logging.info("Building RISC-V instruction generator")
-        for cmd in compile_cmd:
-            cmd = re.sub("<out>", os.path.abspath(output_dir), cmd)
-            cmd = re.sub("<setting>", core_setting_dir, cmd)
+        logging.info("Building RISC-V instruction generator")          # 构建RISC-V 随机指令发生器
+        for cmd in compile_cmd:                      
+            cmd = re.sub("<out>", os.path.abspath(output_dir), cmd)    # 输出路径
+            cmd = re.sub("<setting>", core_setting_dir, cmd)           # setting 路径   riscv_core_setting.sv 
             if ext_dir == "":
-                cmd = re.sub("<user_extension>", "<cwd>/user_extension", cmd)
-            else:
+                cmd = re.sub("<user_extension>", "<cwd>/user_extension", cmd)  # 拓展的文件夹
+            else:             
                 cmd = re.sub("<user_extension>", ext_dir, cmd)
-            cmd = re.sub("<cwd>", cwd, cmd)
-            cmd = re.sub("<cmp_opts>", cmp_opts, cmd)
+            cmd = re.sub("<cwd>", cwd, cmd)                 # 文件系统路径
+            cmd = re.sub("<cmp_opts>", cmp_opts, cmd)       # 编译指令生成器的选项
             if lsf_cmd:
-                cmd = lsf_cmd + " " + cmd
-                run_parallel_cmd([cmd], debug_cmd=debug_cmd)
+                cmd = lsf_cmd + " " + cmd                   # 加集群的配置
+                run_parallel_cmd([cmd], debug_cmd=debug_cmd)  # 多个同时跑
             else:
                 logging.debug("Compile command: {}".format(cmd))
-                run_cmd(cmd, debug_cmd=debug_cmd)
+                run_cmd(cmd, debug_cmd=debug_cmd)           # 运行随机指令生成器
 
 
 def run_csr_test(cmd_list, cwd, csr_file, isa, iterations, lsf_cmd,
