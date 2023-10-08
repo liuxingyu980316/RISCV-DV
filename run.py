@@ -35,13 +35,16 @@ from types import SimpleNamespace
 LOGGER = logging.getLogger()
 
 
-class SeedGen:
+class SeedGen:    # 生成随机种子
     """An object that will generate a pseudo-random seed for test iterations"""
 
-    def __init__(self, start_seed, fixed_seed, seed_yaml):
+    def __init__(self, start_seed, fixed_seed, seed_yaml):  
+        # start_seed：指定起始种子值，如果提供了这个值，那么每次迭代的种子将是这个值加上迭代次数
+        # fixed_seed：指定一个固定的种子值，如果提供了这个值，那么每次迭代的种子都将是这个固定值。这通常用于可重现性。
+        # seed_yaml：指定一个YAML文件路径，该文件中包含特定测试ID的种子值。这样，如果需要重新运行某些测试，可以直接使用指定的种子值。
         # These checks are performed with proper error messages at argument
         # parsing time, but it can't hurt to do a belt-and-braces check here too.
-        assert fixed_seed is None or start_seed is None
+        assert fixed_seed is None or start_seed is None        #这两个不能同时生效
 
         self.fixed_seed = fixed_seed
         self.start_seed = start_seed
@@ -50,38 +53,38 @@ class SeedGen:
     def get(self, test_id, test_iter):
         """Get the seed to use for the given test and iteration"""
 
-        if test_id in self.rerun_seed:
+        if test_id in self.rerun_seed:  # 首先检查test_id是否在rerun_seed字典中。如果是，那么直接返回对应的种子值。
             # Note that test_id includes the iteration index (well, the batch
             # index, at any rate), so this makes sense even if test_iter > 0.
             return self.rerun_seed[test_id]
 
-        if self.fixed_seed is not None:
+        if self.fixed_seed is not None:   # 如果fixed_seed属性不为None，那么说明用户指定了一个固定的种子值。
             # Checked at argument parsing time
-            assert test_iter == 0
+            assert test_iter == 0   # 检查，因为只有第一次迭代应该使用固定的种子值
             return self.fixed_seed
 
         if self.start_seed is not None:
-            return self.start_seed + test_iter
+            return self.start_seed + test_iter   # 如果start_seed属性不为None，那么说明用户指定了一个起始种子值。在这种情况下，返回start_seed + test_iter作为种子值
 
         # If the user didn't specify seeds in some way, we generate a random
         # seed every time
-        return random.getrandbits(31)
+        return random.getrandbits(31)   # 调用get方法时都会生成一个随机的31位种子值
 
 
-def get_generator_cmd(simulator, simulator_yaml, cov, exp, debug_cmd):
+def get_generator_cmd(simulator, simulator_yaml, cov, exp, debug_cmd):   #设置指令生成器的编译和仿真命令
     """ Setup the compile and simulation command for the generator
 
     Args:
-      simulator      : RTL/pyflow simulator used to run instruction generator
-      simulator_yaml : RTL/pyflow simulator configuration file in YAML format
-      cov            : Enable functional coverage
-      exp            : Use experimental version
-      debug_cmd      : Produce the debug cmd log without running
+      simulator      : RTL/pyflow simulator used to run instruction generator   # 用于运行指令生成器的RTL/pyflow模拟器
+      simulator_yaml : RTL/pyflow simulator configuration file in YAML format   # 以YAML格式指定的RTL/pyflow模拟器配置文件路径
+      cov            : Enable functional coverage        # 用于启用功能覆盖率
+      exp            : Use experimental version          # 用于使用实验版本
+      debug_cmd      : Produce the debug cmd log without running  # 用于生成调试命令日志而不执行
 
     Returns:
-      compile_cmd    : RTL/pyflow simulator command to compile the instruction
+      compile_cmd    : RTL/pyflow simulator command to compile the instruction   # 用于编译指令生成器的RTL/pyflow模拟器命令
                        generator
-      sim_cmd        : RTL/pyflow simulator command to run the instruction
+      sim_cmd        : RTL/pyflow simulator command to run the instruction        # 用于运行指令生成器的RTL/pyflow模拟器命令
                        generator
     """
     logging.info("Processing simulator setup file : {}".format(simulator_yaml))
