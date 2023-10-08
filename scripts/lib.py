@@ -33,11 +33,16 @@ RET_FAIL    = 1
 RET_FATAL   = -1
 
 
-def setup_logging(verbose):
+def setup_logging(verbose):  # 目的：用于设置日志的记录，根据verbose选择这个日志是DEBUG的还是INFO
     """Setup the root logger.
 
     Args:
       verbose: Verbose logging
+
+    
+    format: 定义日志记录的格式，asctime：时间  filename：源文件名称  lineno：源文件的行号  levelname：日志记录的级别  message：日志消息  -8s：超长的内容会被截取
+    datefmt： '%a, %d %b %Y %H:%M:%S' 会输出像 'Mon, 06 Mar 2023 15:30:00' 这样的日期和时间格式
+    level： 上述的 levelname的级别
     """
     if verbose:
         logging.basicConfig(
@@ -50,7 +55,7 @@ def setup_logging(verbose):
                             level=logging.INFO)
 
 
-def read_yaml(yaml_file):
+def read_yaml(yaml_file):  #  目的：解析YAML文件并解析为Python字典
     """ Read YAML file to a dictionary
 
     Args:
@@ -58,6 +63,13 @@ def read_yaml(yaml_file):
 
     Returns:
       yaml_data : data read from YAML in dictionary format
+
+   
+    yaml_file: 是一个字符串，表示了yaml文件的路径
+
+    with open: 打开指定的yaml文件并将内容读取到对象f中，“r”是只读打开，with 的作用是文件打开之后能正常的关闭
+    try - except : 尝试进行文件解析，把f的yaml内容解析为Python的字典，并保存在yaml_data中
+                   如果解析失败，记录错误至exc中，把exc保存在logging中，并退出程序，RET_FAIL 定义为 1
     """
     with open(yaml_file, "r") as f:
         try:
@@ -68,7 +80,7 @@ def read_yaml(yaml_file):
     return yaml_data
 
 
-def get_env_var(var, debug_cmd=None):
+def get_env_var(var, debug_cmd=None):  # 目的： 获取环境变量
     """Get the value of environment variable
 
     Args:
@@ -76,6 +88,11 @@ def get_env_var(var, debug_cmd=None):
 
     Returns:
       val : Value of the environment variable
+
+    
+    var： 要获取的环境变量的名称，获取系统路径环境变量的值，var 一般是 "PATH"
+
+    获取的环境变量保存至val 中并返回val值
     """
     try:
         val = os.environ[var]
@@ -88,7 +105,7 @@ def get_env_var(var, debug_cmd=None):
     return val
 
 
-def run_cmd(cmd, timeout_s=999, exit_on_error=1, check_return_code=True,
+def run_cmd(cmd, timeout_s=999, exit_on_error=1, check_return_code=True,  # 目的： 执行shell命令并返回命令的输出
             debug_cmd=None):
     """Run a command and return output
 
@@ -97,6 +114,21 @@ def run_cmd(cmd, timeout_s=999, exit_on_error=1, check_return_code=True,
 
     Returns:
       command output
+
+    
+
+    time_out 超时
+    exit_on_error 错误时是否退出程序
+    check_return_code 是否检查命令的返回码
+    如果有debug_cmd，则把cmd写入文件，之后返回
+
+    exec + cmd : 要执行的shell命令
+    executable: shell命令的解释器
+    universal_newlines=True：这个参数指定输出将使用通用的换行符（\n）来表示，而不是系统默认的换行符。这样可以使得输出在不同的操作系统上保持一致。
+    start_new_session=True：这个参数指定在新的会话中执行命令。这样可以使得命令的执行环境与当前环境隔离，避免受到当前环境的影响。
+    env=os.environ：这个参数指定命令的环境变量。在这里，使用os.environ来获取当前的环境变量，并将其传递给命令。
+    stdout=subprocess.PIPE：这个参数指定命令的标准输出将被捕获，并可以通过communicate()方法来获取。
+    stderr=subprocess.STDOUT：这个参数指定命令的标准错误输出将被捕获，并将其合并到标准输出中。这样可以通过communicate()方法一次性获取命令的所有输出。
     """
     logging.debug(cmd)
     if debug_cmd:
@@ -112,14 +144,14 @@ def run_cmd(cmd, timeout_s=999, exit_on_error=1, check_return_code=True,
                               env=os.environ,
                               stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError:                   # 如果捕获到 subprocess.CalledProcessError 异常，说明命令执行出错。此时，函数将记录错误信息并使用 sys.exit(RET_FAIL) 方法退出程序。
         logging.error(ps.communicate()[0])
         sys.exit(RET_FAIL)
-    except KeyboardInterrupt:
+    except KeyboardInterrupt:                               # 如果捕获到 KeyboardInterrupt 异常，说明用户按下了Ctrl-C键来中断程序执行。此时，函数将记录信息并使用 sys.exit(130) 方法退出程序。
         logging.info("\nExited Ctrl-C from user request.")
         sys.exit(130)
     try:
-        output = ps.communicate(timeout=timeout_s)[0]
+        output = ps.communicate(timeout=timeout_s)[0]       # 如果命令执行超时，将引发 subprocess.TimeoutExpired 异常。
     except subprocess.TimeoutExpired:
         logging.error("Timeout[{}s]: {}".format(timeout_s, cmd))
         output = ""
@@ -128,17 +160,17 @@ def run_cmd(cmd, timeout_s=999, exit_on_error=1, check_return_code=True,
         except AttributeError: #killpg not available on windows
             ps.kill()
     rc = ps.returncode
-    if rc and check_return_code and rc > 0:
+    if rc and check_return_code and rc > 0:  # 如果设置了 check_return_code 参数为True，并且命令返回码大于0，函数将记录错误信息和输出，并根据 exit_on_error 参数的值来决定是否退出程序。
         logging.info(output)
         logging.error(
             "ERROR return code: {}/{}, cmd:{}".format(check_return_code, rc, cmd))
         if exit_on_error:
             sys.exit(RET_FAIL)
-    logging.debug(output)
+    logging.debug(output)       # 函数返回命令的输出，保存在变量 output 中。
     return output
 
 
-def run_parallel_cmd(cmd_list, timeout_s=999, exit_on_error=0,
+def run_parallel_cmd(cmd_list, timeout_s=999, exit_on_error=0,   # 目的： 执行多个shell命令并返回命令的输出
                      check_return_code=True, debug_cmd=None):
     """Run a list of commands in parallel
 
@@ -188,7 +220,7 @@ def run_parallel_cmd(cmd_list, timeout_s=999, exit_on_error=0,
         logging.debug(output)
 
 
-def run_cmd_output(cmd, debug_cmd=None):
+def run_cmd_output(cmd, debug_cmd=None): #  目的： 在Python中执行Shell命令并返回命令输出
     """Run a command and return output
     Args:
       cmd          : Command line to execute
@@ -199,16 +231,16 @@ def run_cmd_output(cmd, debug_cmd=None):
         debug_cmd.write("\n\n")
         return
     try:
-        output = subprocess.check_output(cmd)
+        output = subprocess.check_output(cmd)  # 执行shell 命令并获得其输出
     except subprocess.CalledProcessError as exc:
         logging.debug(exc.output)
-        raise exc
+        raise exc   # 用 raise 语句重新抛出该异常。注意，这里的 raise exc 语句会将异常传递给上层调用者，因此上层调用者需要处理该异常。
         sys.exit(RET_FAIL)
     if output:
-        logging.debug(output)
+        logging.debug(output) # 函数返回命令的输出，保存在变量 output 中。注意，这里的 output 是二进制的输出数据，需要根据需要进行解码和处理。
 
 
-def process_regression_list(testlist, test, iterations, matched_list,
+def process_regression_list(testlist, test, iterations, matched_list,   #目的：从回归测试列表中获取匹配的测试
                             riscv_dv_root):
     """ Get the matched tests from the regression test list
 
@@ -220,16 +252,24 @@ def process_regression_list(testlist, test, iterations, matched_list,
 
     Returns:
       matched_list : A list of matched tests
+    参数：
+      testlist ： 回归测试列表
+      test：要运行的测试，"all "表示列表中的所有测试
+      iterations ： 每个测试的迭代次数
+      riscv_dv_root : RISCV-DV 的根目录
+
+    返回值
+      matched_list ： 匹配测试的列表
     """
     logging.info(
-        "Processing regression test list : {}, test: {}".format(testlist, test))
-    yaml_data = read_yaml(testlist)
-    mult_test = test.split(',')
+        "Processing regression test list : {}, test: {}".format(testlist, test))   # 函数会记录一条信息，表明正在处理哪个回归测试列表和哪个测试。
+    yaml_data = read_yaml(testlist)   #  目的：解析YAML文件并解析为Python字典
+    mult_test = test.split(',')   # 如果输入的test参数包含多个测试（通过逗号分隔），把它们分割成一个列表保存在mult_test变量中
     for entry in yaml_data:
         if 'import' in entry:
             sub_list = re.sub('<riscv_dv_root>', riscv_dv_root, entry['import'])
             process_regression_list(sub_list, test, iterations, matched_list,
-                                    riscv_dv_root)
+                                    riscv_dv_root) # 如果条目包含import字段，这意味着它可能要导入其他的测试列表。在这种情况下，使用正则表达式re.sub来替换<riscv_dv_root>为实际的RISCV-DV根目录，然后递归调用process_regression_list来处理这个导入的测试列表。
         else:
             if (entry['test'] in mult_test) or (test == "all"):
                 if iterations > 0 and entry['iterations'] > 0:
@@ -237,10 +277,10 @@ def process_regression_list(testlist, test, iterations, matched_list,
                 if entry['iterations'] > 0:
                     logging.info("Found matched tests: {}, iterations:{}".format(
                       entry['test'], entry['iterations']))
-                    matched_list.append(entry)
+                    matched_list.append(entry)  # 函数返回一个包含匹配的测试的列表，这个列表在函数中被命名为matched_list。这个列表会被添加到输入参数matched_list中，这样调用者可以在函数外部访问它
 
 
-def create_output(output, noclean, prefix="out_"):
+def create_output(output, noclean, prefix="out_"):  #用于创建一个输出目录
     """ Create output directory
 
   Args:
@@ -249,6 +289,11 @@ def create_output(output, noclean, prefix="out_"):
 
   Returns:
     Output directory
+
+    
+    output：指定的输出目录的名称。
+    noclean：一个布尔值，如果为False，则在创建新的输出目录之前会清除旧的输出目录。
+    prefix：输出目录的前缀，默认值为"out_"。
   """
     # Create output directory
     if output is None:
@@ -256,14 +301,14 @@ def create_output(output, noclean, prefix="out_"):
     if noclean is False:
         os.system("rm -rf {}".format(output))
 
-    logging.info("Creating output directory: {}".format(output))
-    subprocess.run(["mkdir", "-p", output])
-    return output
+    logging.info("Creating output directory: {}".format(output))   #记录日志
+    subprocess.run(["mkdir", "-p", output])     #创建output文件夹
+    return output   #调用者可以使用这个返回值来引用或操作该输出目录。
 
 
-def gpr_to_abi(gpr):
+def gpr_to_abi(gpr):    # 将通用寄存器转换为相应的 abi 名称
     """Convert a general purpose register to its corresponding abi name"""
-    switcher = {
+    switcher = {       #定义了一个switcher的字典，将字符串键映射到其他的字符串值。例如，键 "x0" 映射到值 "zero"，键 "x1" 映射到值 "ra"，以此类推
         "x0" : "zero",
         "x1" : "ra",
         "x2" : "sp",
@@ -329,10 +374,10 @@ def gpr_to_abi(gpr):
         "f30": "ft10",
         "f31": "ft11",
     }
-    return switcher.get(gpr, "na")
+    return switcher.get(gpr, "na")   #尝试从 switcher 字典中获取与键 gpr 对应的值。如果 gpr 不在 switcher 字典中，它将返回默认值 "na"
 
 
-def sint_to_hex(val):
+def sint_to_hex(val):   #有符号整数到十六进制的转换
     """Signed integer to hex conversion"""
     return str(hex((val + (1 << 32)) % (1 << 32)))
 
@@ -340,9 +385,17 @@ def sint_to_hex(val):
 BASE_RE = re.compile(
     r"(?P<rd>[a-z0-9]+?),(?P<imm>[\-0-9]*?)\((?P<rs1>[a-z0-9]+?)\)")
 
+"""
+     例如，对于字符串 "x1,-42(y2)"，这个正则表达式将匹配并提取出以下信息：
+     "rd": "x1"  一个由小写字母和数字组成的字符串
+     "imm": "-42"  一个由数字和破折号组成的字符串
+     "rs1": "y2"   一个由小写字母和数字组成的字符串
+"""
 
-def convert_pseudo_instr(instr_name, operands, binary):
+
+def convert_pseudo_instr(instr_name, operands, binary):      #将伪指令转化为实际的指令，这个函数为给定的伪指令提供了一种转换方法，将其转换为实际的RISC-V汇编指令
     """Convert pseudo instruction to regular instruction"""
+    """instr_name（指令名称）、operands（操作数）和binary（二进制）""" 
     if instr_name == "nop":
         instr_name = "addi"
         operands = "zero,zero,0"
