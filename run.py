@@ -226,8 +226,9 @@ def do_compile(compile_cmd, test_list, core_setting_dir, cwd, ext_dir,    # 编�
                 run_cmd(cmd, debug_cmd=debug_cmd)           # 运行随机指令生成器
 
 
-def run_csr_test(cmd_list, cwd, csr_file, isa, iterations, lsf_cmd,
+def run_csr_test(cmd_list, cwd, csr_file, isa, iterations, lsf_cmd,       # control and status reg  测试
                  end_signature_addr, timeout_s, output_dir, debug_cmd):
+     #命令列表、当前工作目录、CSR文件路径、ISA（Instruction Set Architecture，指令集架构）字符串、迭代次数、LSF命令、结束签名地址、超时时间和输出目录
     """Run CSR test
      It calls a separate python script to generate directed CSR test code,
      located at scripts/gen_csr_test.py.
@@ -245,37 +246,37 @@ def run_csr_test(cmd_list, cwd, csr_file, isa, iterations, lsf_cmd,
         run_cmd(cmd, timeout_s, debug_cmd=debug_cmd)
 
 
-def do_simulate(sim_cmd, simulator, test_list, cwd, sim_opts, seed_gen,
+def do_simulate(sim_cmd, simulator, test_list, cwd, sim_opts, seed_gen,    # 运行指令生成器（instruction generator）并进行仿真
                 csr_file,
                 isa, end_signature_addr, lsf_cmd, timeout_s, log_suffix,
                 batch_size, output_dir, verbose, check_return_code, debug_cmd, target):
     """Run  the instruction generator
 
     Args:
-      sim_cmd               : Simulate command for the generator
-      simulator             : simulator used to run instruction generator
-      test_list             : List of assembly programs to be compiled
-      cwd                   : Filesystem path to RISCV-DV repo
-      sim_opts              : Simulation options for the generator
-      seed_gen              : A SeedGen seed generator
-      csr_file              : YAML file containing description of all CSRs
-      isa                   : Processor supported ISA subset
-      end_signature_addr    : Address that tests will write pass/fail signature to at end of test
-      lsf_cmd               : LSF command used to run the instruction generator
-      timeout_s             : Timeout limit in seconds
-      log_suffix            : Simulation log file name suffix
-      batch_size            : Number of tests to generate per run
-      output_dir            : Output directory of the ELF files
-      verbose               : Verbose logging
-      check_return_code     : Check return code of the command
-      debug_cmd             : Produce the debug cmd log without running
+      sim_cmd               : Simulate command for the generator                 字符串类型的参数，指定了用于运行指令生成器的仿真命令
+      simulator             : simulator used to run instruction generator        字符串类型的参数，指定了用于运行指令生成器的仿真器
+      test_list             : List of assembly programs to be compiled           列表类型的参数，包含了要编译的汇编程序列表
+      cwd                   : Filesystem path to RISCV-DV repo                   字符串类型的参数，指定了RISCV-DV仓库的文件系统路径
+      sim_opts              : Simulation options for the generator               字符串类型的参数，指定了用于运行指令生成器的仿真选项
+      seed_gen              : A SeedGen seed generator                           种子生成器对象，用于生成随机种子以进行仿真
+      csr_file              : YAML file containing description of all CSRs       字符串类型的参数，指定了包含所有CSR描述的YAML文件路径
+      isa                   : Processor supported ISA subset                     字符串类型的参数，指定了处理器支持的ISA指令集
+      end_signature_addr    : Address that tests will write pass/fail signature to at end of test    整数类型的参数，指定了测试将在结束时将通过/失败的标志写入的地址
+      lsf_cmd               : LSF command used to run the instruction generator      字符串类型的参数，指定了用于运行指令生成器的LSF命令
+      timeout_s             : Timeout limit in seconds                           整数类型的参数，指定了仿真的超时时间限制（以秒为单位）
+      log_suffix            : Simulation log file name suffix                    字符串类型的参数，指定了仿真日志文件名的后缀
+      batch_size            : Number of tests to generate per run                整数类型的参数，指定了每次运行生成的测试数量
+      output_dir            : Output directory of the ELF files                  字符串类型的参数，指定了ELF文件的输出目录
+      verbose               : Verbose logging                                    布尔类型的参数，指定了是否启用详细日志记录
+      check_return_code     : Check return code of the command                   布尔类型的参数，指定了是否检查命令的返回码
+      debug_cmd             : Produce the debug cmd log without running          布尔类型的参数，指定了是否生成调试命令日志而不执行命令   
     """
     cmd_list = []
-    sim_cmd = re.sub("<out>", os.path.abspath(output_dir), sim_cmd)
+    sim_cmd = re.sub("<out>", os.path.abspath(output_dir), sim_cmd)   # os.path.abspath函数用于获取输出目录的绝对路径，确保路径的正确性。
     sim_cmd = re.sub("<cwd>", cwd, sim_cmd)
     sim_cmd = re.sub("<sim_opts>", sim_opts, sim_cmd)
 
-    logging.info("Running RISC-V instruction generator")
+    logging.info("Running RISC-V instruction generator")              # 打印消息 运行 RISCV 指令发生器
     sim_seed = {}
     for test in test_list:
         iterations = test['iterations']
