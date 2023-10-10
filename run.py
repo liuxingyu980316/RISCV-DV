@@ -175,7 +175,7 @@ def parse_iss_yaml(iss, iss_yaml, isa, setting_dir, debug_cmd):    # 解析ISS�
     sys.exit(RET_FAIL)
 
 
-def get_iss_cmd(base_cmd, elf, log):
+def get_iss_cmd(base_cmd, elf, log):     # 准备 iss 模拟器的cmd 指令
     """Get the ISS simulation command
 
     Args:
@@ -278,30 +278,30 @@ def do_simulate(sim_cmd, simulator, test_list, cwd, sim_opts, seed_gen,    # 运
 
     logging.info("Running RISC-V instruction generator")              # 打印消息 运行 RISCV 指令发生器
     sim_seed = {}
-    for test in test_list:
-        iterations = test['iterations']
+    for test in test_list:                                            # 相当于把test 转化成 cmd
+        iterations = test['iterations']                               # 测试的迭代次数
         logging.info("Generating {} {}".format(iterations, test['test']))
         if iterations > 0:
             # Running a CSR test
             if test['test'] == 'riscv_csr_test':
-                run_csr_test(cmd_list, cwd, csr_file, isa, iterations, lsf_cmd,
+                run_csr_test(cmd_list, cwd, csr_file, isa, iterations, lsf_cmd,   # 控制寄存器测试
                              end_signature_addr, timeout_s, output_dir,
                              debug_cmd)
             else:
                 batch_cnt = 1
                 if batch_size > 0:
-                    batch_cnt = int((iterations + batch_size - 1) / batch_size)
+                    batch_cnt = int((iterations + batch_size - 1) / batch_size)    # 计算出运行的次数
                 logging.info(
                     "Running {} with {} batches".format(test['test'],
                                                         batch_cnt))
                 for i in range(0, batch_cnt):
                     test_id = '{}_{}'.format(test['test'], i)
-                    rand_seed = seed_gen.get(test_id, i * batch_cnt)
+                    rand_seed = seed_gen.get(test_id, i * batch_cnt)       # 得到随机种子
                     if i < batch_cnt - 1:
                         test_cnt = batch_size
                     else:
-                        test_cnt = iterations - i * batch_size
-                    if simulator == "pyflow":
+                        test_cnt = iterations - i * batch_size              # 运行次数
+                    if simulator == "pyflow":                               # 运行的sim_cmd 和 cmd
                         sim_cmd = re.sub("<test_name>", test['gen_test'],
                                          sim_cmd)
                         cmd = lsf_cmd + " " + sim_cmd.rstrip() + \
@@ -315,7 +315,7 @@ def do_simulate(sim_cmd, simulator, test_list, cwd, sim_opts, seed_gen,    # 运
                               (" --target=%s " % (target)) + \
                               (" --gen_test=%s " % (test['gen_test'])) + \
                               (" --seed={} ".format(rand_seed))
-                    else:
+                    else:                                                      # 其余的cmd
                         cmd = lsf_cmd + " " + sim_cmd.rstrip() + \
                               (" +UVM_TESTNAME={} ".format(test['gen_test'])) + \
                               (" +num_of_tests={} ".format(test_cnt)) + \
@@ -324,74 +324,74 @@ def do_simulate(sim_cmd, simulator, test_list, cwd, sim_opts, seed_gen,    # 运
                                   output_dir, test['test'])) + \
                               (" -l {}/sim_{}_{}{}.log ".format(
                                   output_dir, test['test'], i, log_suffix))
-                    if verbose and simulator != "pyflow":
+                    if verbose and simulator != "pyflow":                      # 详细的记录
                         cmd += "+UVM_VERBOSITY=UVM_HIGH "
-                    cmd = re.sub("<seed>", str(rand_seed), cmd)
-                    cmd = re.sub("<test_id>", test_id, cmd)
-                    sim_seed[test_id] = str(rand_seed)
+                    cmd = re.sub("<seed>", str(rand_seed), cmd)                # 加入seed
+                    cmd = re.sub("<test_id>", test_id, cmd)                    # 加入test_id
+                    sim_seed[test_id] = str(rand_seed)                         # 保存种子号
                     if "gen_opts" in test:
                         if simulator == "pyflow":
                             test['gen_opts'] = re.sub("\+", "--",
-                                                      test['gen_opts'])
+                                                      test['gen_opts'])        # 将test['gen_opts']字符串中的所有+字符替换为--字符
                             cmd += test['gen_opts']
                         else:
                             cmd += test['gen_opts']
                     if not re.search("c", isa):
-                        cmd += "+disable_compressed_instr=1 "
+                        cmd += "+disable_compressed_instr=1 "                  # 指令集的名字中没有c,则禁用压缩
                     if lsf_cmd:
-                        cmd_list.append(cmd)
+                        cmd_list.append(cmd)                                   # 如果是lsf，就把cmd加到cmd_list中
                     else:
                         logging.info(
-                            "Running {}, batch {}/{}, test_cnt:{}".format(
+                            "Running {}, batch {}/{}, test_cnt:{}".format(     # 如果不是lsf，则打印 test_name 第几次运行/共几次  运行次数
                                 test['test'], i + 1, batch_cnt, test_cnt))
-                        run_cmd(cmd, timeout_s,
+                        run_cmd(cmd, timeout_s,                                # 运行
                                 check_return_code=check_return_code,
                                 debug_cmd=debug_cmd)
     if sim_seed:
-        with open(('{}/seed.yaml'.format(os.path.abspath(output_dir))),
-                  'w') as outfile:
-            yaml.dump(sim_seed, outfile, default_flow_style=False)
-    if lsf_cmd:
+        with open(('{}/seed.yaml'.format(os.path.abspath(output_dir))),        # 打开seed.yaml 没有这个文件的话就创建一个
+                  'w') as outfile:                             
+            yaml.dump(sim_seed, outfile, default_flow_style=False)             # 把seed种子号保存起来
+    if lsf_cmd:                                                                # 如果使用的是lsf 则使用 cmd_list 跑程序
         run_parallel_cmd(cmd_list, timeout_s,
                          check_return_code=check_return_code,
                          debug_cmd=debug_cmd)
 
 
-def gen(test_list, argv, output_dir, cwd):
+def gen(test_list, argv, output_dir, cwd):    #  运行指令发生器 todo： 和上面的有什么区别
     """Run the instruction generator
 
     Args:
-      test_list             : List of assembly programs to be compiled
-      argv                  : Configuration arguments
-      output_dir            : Output directory of the ELF files
-      cwd                   : Filesystem path to RISCV-DV repo
+      test_list             : List of assembly programs to be compiled   要编译的汇编程序列表
+      argv                  : Configuration arguments                    配置参数
+      output_dir            : Output directory of the ELF files          ELF文件的输出目录
+      cwd                   : Filesystem path to RISCV-DV repo           RISCV-DV仓库的文件系统路径
     """
-    check_return_code = True
-    if argv.simulator == "ius":
+    check_return_code = True        # 默认情况下需要检查指令生成器的返回码
+    if argv.simulator == "ius":     # 使用的是Incisive模拟器，它将在测试通过时返回非零的返回码。
         # Incisive return non-zero return code even test passes
-        check_return_code = False
+        check_return_code = False      
         logging.debug(
             "Disable return_code checking for {}".format(argv.simulator))
-    # Mutually exclusive options between compile_only and sim_only
-    if argv.co and argv.so:
+    # Mutually exclusive options between compile_only and sim_only        
+    if argv.co and argv.so:                  # 仅编译 仅模拟 互斥
         logging.error("argument -co is not allowed with argument -so")
         return
-    if argv.co == 0 and len(test_list) == 0:
+    if argv.co == 0 and len(test_list) == 0:    # 没有指定编译选项；test_list列表的长度为0，表示没有需要模拟的测试程序。说明没有需要编译的测试程序，也没有需要模拟的测试程序
         return
     # Setup the compile and simulation command for the generator
-    compile_cmd, sim_cmd = get_generator_cmd(argv.simulator,
+    compile_cmd, sim_cmd = get_generator_cmd(argv.simulator,        #设置指令生成器的编译和仿真命令
                                              argv.simulator_yaml, argv.cov,
                                              argv.exp, argv.debug)
     # Compile the instruction generator
-    # No compilation process in pyflow simulator
-    if not argv.so:
+    # No compilation process in pyflow simulator      # 编译过程， 在pyflow模拟器中没有编译的过程
+    if not argv.so:                   # 如果不是仅仿真，就执行编译
         do_compile(compile_cmd, test_list, argv.core_setting_dir, cwd,
                    argv.user_extension_dir,
                    argv.cmp_opts, output_dir, argv.debug, argv.lsf_cmd)
     # Run the instruction generator
-    if not argv.co:
+    if not argv.co:                   # 如果不是仅编译，就执行仿真
         seed_gen = SeedGen(argv.start_seed, argv.seed, argv.seed_yaml)
-        if argv.simulator == 'pyflow':
+        if argv.simulator == 'pyflow':   # 根据是否是 pyflow 指定仿真时间
             """Default timeout of Pyflow is 20 minutes, if the user
                doesn't specified their own gen_timeout value from CMD
             """
@@ -401,7 +401,7 @@ def gen(test_list, argv, output_dir, cwd):
                 gen_timeout = argv.gen_timeout
         else:
             gen_timeout = argv.gen_timeout
-        do_simulate(sim_cmd, argv.simulator, test_list, cwd, argv.sim_opts,
+        do_simulate(sim_cmd, argv.simulator, test_list, cwd, argv.sim_opts,    # 开启仿真
                     seed_gen,
                     argv.csr_yaml, argv.isa, argv.end_signature_addr,
                     argv.lsf_cmd,
@@ -410,30 +410,30 @@ def gen(test_list, argv, output_dir, cwd):
                     argv.verbose, check_return_code, argv.debug, argv.target)
 
 
-def gcc_compile(test_list, output_dir, isa, mabi, opts, debug_cmd):
+def gcc_compile(test_list, output_dir, isa, mabi, opts, debug_cmd):      # 使用RISC-V GCC工具链编译汇编
     """Use riscv gcc toolchain to compile the assembly program
 
     Args:
-      test_list  : List of assembly programs to be compiled
-      output_dir : Output directory of the ELF files
-      isa        : ISA variant passed to GCC
-      mabi       : MABI variant passed to GCC
-      debug_cmd  : Produce the debug cmd log without running
+      test_list  : List of assembly programs to be compiled       包含要编译的汇编程序的列表
+      output_dir : Output directory of the ELF files              字符串，表示ELF文件的输出目录
+      isa        : ISA variant passed to GCC                      字符串，表示传递给GCC的ISA变体，例如RV32I是32位整数指令集，RV64I是64位整数指令集，RV128I是128位整数指令集。
+      mabi       : MABI variant passed to GCC                     字符串，表示传递给GCC的MABI变体，MABI定义了整数和浮点调用约定，例如ILP32 MABI在32位系统中使用32位整数和32位浮点数，LP64 MABI在64位系统中使用64位整数和64位浮点数
+      debug_cmd  : Produce the debug cmd log without running      布尔类型的变量，用于指示是否生成调试命令日志而不执行命令。
     """
     cwd = os.path.dirname(os.path.realpath(__file__))
     for test in test_list:
         for i in range(0, test['iterations']):
-            if 'no_gcc' in test and test['no_gcc'] == 1:
+            if 'no_gcc' in test and test['no_gcc'] == 1:           判断是否不需要 gcc编译
                 continue
             prefix = ("{}/asm_test/{}_{}".format(output_dir, test['test'], i))
-            asm = prefix + ".S"
-            elf = prefix + ".o"
-            binary = prefix + ".bin"
+            asm = prefix + ".S"              # 生成汇编文件的路径和名称
+            elf = prefix + ".o"              # 生成ELF文件的路径和名称
+            binary = prefix + ".bin"         # 生成二进制文件的路径和名称
             test_isa = isa
-            if not os.path.isfile(asm) and not debug_cmd:
+            if not os.path.isfile(asm) and not debug_cmd:    # 检查汇编文件是否存在，不存在的话就报错
                 logging.error("Cannot find assembly test: {}\n".format(asm))
                 sys.exit(RET_FAIL)
-            # gcc compilation
+            # gcc compilation                      # 生成 gcc的指令
             cmd = ("{} -static -mcmodel=medany \
              -fvisibility=hidden -nostdlib \
              -nostartfiles {} \
@@ -441,89 +441,90 @@ def gcc_compile(test_list, output_dir, isa, mabi, opts, debug_cmd):
              -T{}/scripts/link.ld {} -o {} ".format(
                 get_env_var("RISCV_GCC", debug_cmd=debug_cmd), asm, cwd,
                 cwd, opts, elf))
-            if 'gcc_opts' in test:
+            if 'gcc_opts' in test:              
                 cmd += test['gcc_opts']
             if 'gen_opts' in test:
-                # Disable compressed instruction
+                # Disable compressed instruction       # 禁用压缩指令
                 if re.search('disable_compressed_instr', test['gen_opts']):
                     test_isa = re.sub("c", "", test_isa)
             # If march/mabi is not defined in the test gcc_opts, use the default
             # setting from the command line.
             if not re.search('march', cmd):
-                cmd += (" -march={}".format(test_isa))
+                cmd += (" -march={}".format(test_isa))     # 处理器的架构
             if not re.search('mabi', cmd):
-                cmd += (" -mabi={}".format(mabi))
-            logging.info("Compiling {}".format(asm))
-            run_cmd_output(cmd.split(), debug_cmd=debug_cmd)
+                cmd += (" -mabi={}".format(mabi))          # 处理器mabi变种
+            logging.info("Compiling {}".format(asm))       # 编译汇编文件
+            run_cmd_output(cmd.split(), debug_cmd=debug_cmd)  # 在Python中执行Shell命令并返回命令输出
             # Convert the ELF to plain binary, used in RTL sim
-            logging.info("Converting to {}".format(binary))
+            logging.info("Converting to {}".format(binary))  # 转化成二进制文件
             cmd = ("{} -O binary {} {}".format(
-                get_env_var("RISCV_OBJCOPY", debug_cmd=debug_cmd), elf, binary))
-            run_cmd_output(cmd.split(), debug_cmd=debug_cmd)
+                get_env_var("RISCV_OBJCOPY", debug_cmd=debug_cmd), elf, binary))  # RISCV_OBJCOPY工具： 将ELF 格式的对象文件转换为二进制格式或者其他格式的文件
+            run_cmd_output(cmd.split(), debug_cmd=debug_cmd)   # 在Python中执行Shell命令并返回命令输出  
+                  # "riscv64-unknown-elf-gcc -o test test.c"，那么 cmd.split() 的结果就是 ["riscv64-unknown-elf-gcc", "-o", "test", "test.c"]
 
 
 def run_assembly(asm_test, iss_yaml, isa, mabi, gcc_opts, iss_opts, output_dir,
-                 setting_dir, debug_cmd):
+                 setting_dir, debug_cmd):           # 使用iss 模拟器进行定向汇编测试
     """Run a directed assembly test with ISS
 
     Args:
-      asm_test    : Assembly test file
-      iss_yaml    : ISS configuration file in YAML format
-      isa         : ISA variant passed to the ISS
-      mabi        : MABI variant passed to GCC
-      gcc_opts    : User-defined options for GCC compilation
-      iss_opts    : Instruction set simulators
-      output_dir  : Output directory of compiled test files
-      setting_dir : Generator setting directory
-      debug_cmd   : Produce the debug cmd log without running
+      asm_test    : Assembly test file                           汇编测试文件 
+      iss_yaml    : ISS configuration file in YAML format        YAML 格式的 ISS 配置文件
+      isa         : ISA variant passed to the ISS                传递给 ISS 的 ISA 变体
+      mabi        : MABI variant passed to GCC                   传给 GCC 的 MABI 变体
+      gcc_opts    : User-defined options for GCC compilation     用于 GCC 编译的用户自定义选项
+      iss_opts    : Instruction set simulators                   指令集模拟器
+      output_dir  : Output directory of compiled test files      编译测试文件的输出目录
+      setting_dir : Generator setting directory                  生成器设置目录
+      debug_cmd   : Produce the debug cmd log without running    在不运行的情况下生成调试 cmd 日志
     """
-    if not asm_test.endswith(".S"):
+    if not asm_test.endswith(".S"):                             # 检查文件是否以.S 结尾，汇编文件均以.S 结尾
         logging.error("{} is not an assembly .S file".format(asm_test))
         return
-    cwd = os.path.dirname(os.path.realpath(__file__))
-    asm_test = os.path.expanduser(asm_test)
-    report = ("{}/iss_regr.log".format(output_dir)).rstrip()
-    asm = re.sub(r"^.*\/", "", asm_test)
-    asm = re.sub(r"\.S$", "", asm)
-    prefix = ("{}/directed_asm_test/{}".format(output_dir, asm))
-    elf = prefix + ".o"
-    binary = prefix + ".bin"
-    iss_list = iss_opts.split(",")
-    run_cmd("mkdir -p {}/directed_asm_test".format(output_dir))
-    logging.info("Compiling assembly test : {}".format(asm_test))
+    cwd = os.path.dirname(os.path.realpath(__file__))          # 获取当前执行脚本所在的目录路径
+    asm_test = os.path.expanduser(asm_test)                    # 来解析用户主目录的缩写（如 "~"），并将其扩展为完整的用户主目录路径，
+    report = ("{}/iss_regr.log".format(output_dir)).rstrip()   # 生成一个报告文件的路径和名称,rstrip()方法去除路径字符串末尾的空格和换行符
+    asm = re.sub(r"^.*\/", "", asm_test)                       # 只保留 asm中的文件名部分
+    asm = re.sub(r"\.S$", "", asm)                             # 把.S 删了只剩名字
+    prefix = ("{}/directed_asm_test/{}".format(output_dir, asm))  # 文件的路径
+    elf = prefix + ".o"            # elf文件的路径
+    binary = prefix + ".bin"       # binary 文件的路径
+    iss_list = iss_opts.split(",")    # 分隔iss_opt选项                   
+    run_cmd("mkdir -p {}/directed_asm_test".format(output_dir))    # 创建输出路径的文件夹
+    logging.info("Compiling assembly test : {}".format(asm_test))   # 编译测试文件
 
     # gcc compilation
-    cmd = ("{} -static -mcmodel=medany \
+    cmd = ("{} -static -mcmodel=medany \             # 使用RISC-V GCC 编译器来编译汇编测试文件
          -fvisibility=hidden -nostdlib \
          -nostartfiles {} \
          -I{}/user_extension \
          -T{}/scripts/link.ld {} -o {} ".format(
-        get_env_var("RISCV_GCC", debug_cmd=debug_cmd), asm_test, cwd,
+        get_env_var("RISCV_GCC", debug_cmd=debug_cmd), asm_test, cwd,     # 这个环境变量存储了 RISC-V GCC 编译器的路径
         cwd, gcc_opts, elf))
-    cmd += (" -march={}".format(isa))
+    cmd += (" -march={}".format(isa))    # 两行代码是将 ISA 和 MABI 的值添加到编译命令中。
     cmd += (" -mabi={}".format(mabi))
-    run_cmd_output(cmd.split(), debug_cmd=debug_cmd)
-    # Convert the ELF to plain binary, used in RTL sim
+    run_cmd_output(cmd.split(), debug_cmd=debug_cmd)    # 执行这个cmd shell执行
+    # Convert the ELF to plain binary, used in RTL sim   # 用来将编译生成的 ELF 文件转换为纯二进制文件
     logging.info("Converting to {}".format(binary))
     cmd = ("{} -O binary {} {}".format(
-        get_env_var("RISCV_OBJCOPY", debug_cmd=debug_cmd), elf, binary))
-    run_cmd_output(cmd.split(), debug_cmd=debug_cmd)
-    log_list = []
+        get_env_var("RISCV_OBJCOPY", debug_cmd=debug_cmd), elf, binary))   # 这个环境变量存储了 RISC-V objcopy 工具的路径
+    run_cmd_output(cmd.split(), debug_cmd=debug_cmd)    # 执行这个cmd shell执行
+    log_list = []   # 空列表，用于存储日志文件的路径和名称
     # ISS simulation
-    for iss in iss_list:
-        run_cmd("mkdir -p {}/{}_sim".format(output_dir, iss))
-        log = ("{}/{}_sim/{}.log".format(output_dir, iss, asm))
-        log_list.append(log)
-        base_cmd = parse_iss_yaml(iss, iss_yaml, isa, setting_dir, debug_cmd)
-        logging.info("[{}] Running ISS simulation: {}".format(iss, elf))
-        cmd = get_iss_cmd(base_cmd, elf, log)
-        run_cmd(cmd, 10, debug_cmd=debug_cmd)
+    for iss in iss_list:       # 是一个由 ISS 选项组成的列表，每个元素代表一个不同的 ISS。
+        run_cmd("mkdir -p {}/{}_sim".format(output_dir, iss))   # 创建一个用于存储 ISS 仿真结果的目录。目录的路径由 output_dir 和 iss 变量组成。
+        log = ("{}/{}_sim/{}.log".format(output_dir, iss, asm))  # 生成一个日志文件的路径和名称，该日志文件用于记录 ISS 仿真的结果
+        log_list.append(log)   # 这行代码是将生成的日志文件路径和名称添加到 log_list 列表中，以便后续使用
+        base_cmd = (iss, iss_yaml, isa, setting_dir, debug_cmd)   # 解析ISS（Instruction Set Simulator，指令集模拟器）的YAML配置文件，以获取模拟命令
+        logging.info("[{}] Running ISS simulation: {}".format(iss, elf))  # 跑 ISS 模拟器
+        cmd = get_iss_cmd(base_cmd, elf, log)   # 准备 iss 模拟器的 cmd指令
+        run_cmd(cmd, 10, debug_cmd=debug_cmd)   # 跑iss 模拟器 并且把结果存在log文件里
         logging.info("[{}] Running ISS simulation: {} ...done".format(iss, elf))
-    if len(iss_list) == 2:
-        compare_iss_log(iss_list, log_list, report)
+    if len(iss_list) == 2:   # 比较两个不同 ISS 的仿真结果。该函数的参数包括 ISS 选项的列表、日志文件路径和名称的列表以及报告文件的路径和名称
+        compare_iss_log(iss_list, log_list, report) 
 
 
-def run_assembly_from_dir(asm_test_dir, iss_yaml, isa, mabi, gcc_opts, iss,
+def run_assembly_from_dir(asm_test_dir, iss_yaml, isa, mabi, gcc_opts, iss,  # 和上面的函数差不多，只不过这个是从一个目录里面遍历所有的汇编测试文件
                           output_dir, setting_dir, debug_cmd):
     """Run a directed assembly test from a directory with spike
 
@@ -537,14 +538,20 @@ def run_assembly_from_dir(asm_test_dir, iss_yaml, isa, mabi, gcc_opts, iss,
       output_dir      : Output directory of compiled test files
       setting_dir     : Generator setting directory
       debug_cmd       : Produce the debug cmd log without running
+     1.遍历指定目录中的所有汇编测试文件。
+     2.对每个汇编测试文件，使用GCC编译器和指定的编译选项进行编译，生成ELF（Executable and Linkable Format，可执行与可链接格式）文件。
+     3.将ELF文件转换为纯二进制文件，以便在RTL（Register-Transfer Level，寄存器传输级别）仿真中使用。
+     4.使用指定的ISS模拟器对二进制文件进行仿真。
+     5.记录仿真结果和其他相关信息，如使用的ISS、ISA、MABI等。
+     6.如果指定了多个ISS模拟器，还可以比较不同模拟器的仿真结果。
     """
-    result = run_cmd("find {} -name \"*.S\"".format(asm_test_dir))
+    result = run_cmd("find {} -name \"*.S\"".format(asm_test_dir))    #搜索指定目录中所有以 .S 结尾的文件。
     if result:
         asm_list = result.splitlines()
         logging.info("Found {} assembly tests under {}".format(
             len(asm_list), asm_test_dir))
         for asm_file in asm_list:
-            run_assembly(asm_file, iss_yaml, isa, mabi, gcc_opts, iss,
+            run_assembly(asm_file, iss_yaml, isa, mabi, gcc_opts, iss,   # 运行上一个函数
                          output_dir,
                          setting_dir, debug_cmd)
             if "," in iss:
@@ -555,12 +562,12 @@ def run_assembly_from_dir(asm_test_dir, iss_yaml, isa, mabi, gcc_opts, iss,
             "No assembly test(*.S) found under {}".format(asm_test_dir))
 
 
-def run_c(c_test, iss_yaml, isa, mabi, gcc_opts, iss_opts, output_dir,
+def run_c(c_test, iss_yaml, isa, mabi, gcc_opts, iss_opts, output_dir,   # # 使用iss 模拟器进行定向C测试
           setting_dir, debug_cmd):
-    """Run a directed c test with ISS
+    """Run a directed c test with ISS 
 
     Args:
-      c_test      : C test file
+      c_test      : C test file    和上面的类似
       iss_yaml    : ISS configuration file in YAML format
       isa         : ISA variant passed to the ISS
       mabi        : MABI variant passed to GCC
@@ -571,7 +578,7 @@ def run_c(c_test, iss_yaml, isa, mabi, gcc_opts, iss_opts, output_dir,
       debug_cmd   : Produce the debug cmd log without running
     """
     if not c_test.endswith(".c"):
-        logging.error("{} is not a .c file".format(c_test))
+        logging.error("{} is not a .c file".format(c_test))    # 如果没有找到.c 结尾的文件，就报错
         return
     cwd = os.path.dirname(os.path.realpath(__file__))
     c_test = os.path.expanduser(c_test)
@@ -606,7 +613,7 @@ def run_c(c_test, iss_yaml, isa, mabi, gcc_opts, iss_opts, output_dir,
         run_cmd("mkdir -p {}/{}_sim".format(output_dir, iss))
         log = ("{}/{}_sim/{}.log".format(output_dir, iss, c))
         log_list.append(log)
-        base_cmd = parse_iss_yaml(iss, iss_yaml, isa, setting_dir, debug_cmd)
+        base_cmd = (iss, iss_yaml, isa, setting_dir, debug_cmd)
         logging.info("[{}] Running ISS simulation: {}".format(iss, elf))
         cmd = get_iss_cmd(base_cmd, elf, log)
         run_cmd(cmd, 10, debug_cmd=debug_cmd)
@@ -615,7 +622,7 @@ def run_c(c_test, iss_yaml, isa, mabi, gcc_opts, iss_opts, output_dir,
         compare_iss_log(iss_list, log_list, report)
 
 
-def run_c_from_dir(c_test_dir, iss_yaml, isa, mabi, gcc_opts, iss,
+def run_c_from_dir(c_test_dir, iss_yaml, isa, mabi, gcc_opts, iss,     # 和上面的类似
                    output_dir, setting_dir, debug_cmd):
     """Run a directed c test from a directory with spike
 
@@ -644,9 +651,9 @@ def run_c_from_dir(c_test_dir, iss_yaml, isa, mabi, gcc_opts, iss,
         logging.error("No c test(*.c) found under {}".format(c_test_dir))
 
 
-def iss_sim(test_list, output_dir, iss_list, iss_yaml, iss_opts,
+def iss_sim(test_list, output_dir, iss_list, iss_yaml, iss_opts,      # 使用生成的测试程序运行 ISS 仿真
             isa, setting_dir, timeout_s, debug_cmd):
-    """Run ISS simulation with the generated test program
+    """Run ISS simulation with the generated test program   
 
     Args:
       test_list   : List of assembly programs to be compiled
@@ -661,7 +668,7 @@ def iss_sim(test_list, output_dir, iss_list, iss_yaml, iss_opts,
     """
     for iss in iss_list.split(","):
         log_dir = ("{}/{}_sim".format(output_dir, iss))
-        base_cmd = parse_iss_yaml(iss, iss_yaml, isa, setting_dir, debug_cmd)
+        base_cmd = parse_iss_yaml(iss, iss_yaml, isa, setting_dir, debug_cmd)  # 解析ISS（Instruction Set Simulator，指令集模拟器）的YAML配置文件，以获取模拟命令
         logging.info("{} sim log dir: {}".format(iss, log_dir))
         run_cmd_output(["mkdir", "-p", log_dir])
         for test in test_list:
@@ -673,7 +680,7 @@ def iss_sim(test_list, output_dir, iss_list, iss_yaml, iss_opts,
                         output_dir, test['test'], i))
                     elf = prefix + ".o"
                     log = ("{}/{}_{}.log".format(log_dir, test['test'], i))
-                    cmd = get_iss_cmd(base_cmd, elf, log)
+                    cmd = get_iss_cmd(base_cmd, elf, log)    # # 准备 iss 模拟器的cmd 指令
                     if 'iss_opts' in test:
                         cmd += ' '
                         cmd += test['iss_opts']
@@ -685,52 +692,53 @@ def iss_sim(test_list, output_dir, iss_list, iss_yaml, iss_opts,
                     logging.debug(cmd)
 
 
-def iss_cmp(test_list, iss, output_dir, stop_on_first_error, exp, debug_cmd):
+def iss_cmp(test_list, iss, output_dir, stop_on_first_error, exp, debug_cmd):    # 比较 ISS 模拟结果
     """Compare ISS simulation reult
 
     Args:
-      test_list      : List of assembly programs to be compiled
-      iss            : List of instruction set simulators
-      output_dir     : Output directory of the ELF files
-      stop_on_first_error : will end run on first error detected
-      exp            : Use experimental version
-      debug_cmd      : Produce the debug cmd log without running
+      test_list      : List of assembly programs to be compiled     要编译的汇编程序列表
+      iss            : List of instruction set simulators           指令集模拟器列表
+      output_dir     : Output directory of the ELF files            ELF文件的输出目录
+      stop_on_first_error : will end run on first error detected    是否检测到第一个错误时停止运行
+      exp            : Use experimental version                     使用实验版本的模拟器进行比较
+      debug_cmd      : Produce the debug cmd log without running    生成调试命令日志但不执行命令
+      遍历汇编程序列表和模拟器列表，对每个汇编程序使用指定的模拟器进行模拟执行。比较不同模拟器的模拟结果，检查是否存在差异或错误。
     """
     if debug_cmd:
         return
     iss_list = iss.split(",")
     if len(iss_list) != 2:
         return
-    report = ("{}/iss_regr.log".format(output_dir)).rstrip()
-    run_cmd("rm -rf {}".format(report))
+    report = ("{}/iss_regr.log".format(output_dir)).rstrip()         # 输出的 report 地址
+    run_cmd("rm -rf {}".format(report))                              # 清空原来的文件夹内容
     for test in test_list:
-        for i in range(0, test['iterations']):
-            elf = ("{}/asm_test/{}_{}.o".format(output_dir, test['test'], i))
+        for i in range(0, test['iterations']):                       # 跑的次数
+            elf = ("{}/asm_test/{}_{}.o".format(output_dir, test['test'], i))      # 汇编程序的测试
             logging.info("Comparing ISS sim result {}/{} : {}".format(
                 iss_list[0], iss_list[1], elf))
             log_list = []
-            run_cmd(("echo 'Test binary: {}' >> {}".format(elf, report)))
+            run_cmd(("echo 'Test binary: {}' >> {}".format(elf, report)))    # 把elf字符串 追加保存在reprot中
             for iss in iss_list:
                 log_list.append(
                     "{}/{}_sim/{}.{}.log".format(output_dir, iss, test['test'], i))
-            compare_iss_log(iss_list, log_list, report, stop_on_first_error,
+            compare_iss_log(iss_list, log_list, report, stop_on_first_error,      # 比对
                             exp)
-    save_regr_report(report)
+    save_regr_report(report)     # 保存比对结果
 
 
-def compare_iss_log(iss_list, log_list, report, stop_on_first_error=0,
+def compare_iss_log(iss_list, log_list, report, stop_on_first_error=0,          #比较两个指令集模拟器（ISS）的日志输出
                     exp=False):
-    if len(iss_list) != 2 or len(log_list) != 2:
+    if len(iss_list) != 2 or len(log_list) != 2:                       # 函数检查iss_list和log_list的长度是否都为2
         logging.error("Only support comparing two ISS logs")
     else:
-        csv_list = []
-        for i in range(2):
+        csv_list = []           # 创建一个空的csv_list列表，用于存储转换后的CSV文件
+        for i in range(2):      
             log = log_list[i]
             csv = log.replace(".log", ".csv")
             iss = iss_list[i]
             csv_list.append(csv)
             if iss == "spike":
-                process_spike_sim_log(log, csv)
+                process_spike_sim_log(log, csv)       # 处理spike模拟日志文件，提取指令和受影响的寄存器信息，并将结果写入CSV文件， 下同
             elif iss == "ovpsim":
                 process_ovpsim_sim_log(log, csv, stop_on_first_error)
             elif iss == "sail":
@@ -740,12 +748,12 @@ def compare_iss_log(iss_list, log_list, report, stop_on_first_error=0,
             else:
                 logging.error("Unsupported ISS {}".format(iss))
                 sys.exit(RET_FAIL)
-        result = compare_trace_csv(csv_list[0], csv_list[1], iss_list[0],
+        result = compare_trace_csv(csv_list[0], csv_list[1], iss_list[0],  # 比较两个 CSV 文件，scripts/instr_trace_compare.py
                                    iss_list[1], report)
         logging.info(result)
 
 
-def save_regr_report(report):
+def save_regr_report(report):     # 统计report中的 pass和fail数量 并 输出到 report中
     passed_cnt = run_cmd("grep PASSED {} | wc -l".format(report)).strip()
     failed_cnt = run_cmd("grep FAILED {} | wc -l".format(report)).strip()
     summary = ("{} PASSED, {} FAILED".format(passed_cnt, failed_cnt))
@@ -754,157 +762,164 @@ def save_regr_report(report):
     logging.info("ISS regression report is saved to {}".format(report))
 
 
-def read_seed(arg):
+def read_seed(arg):   # 从命令行中解析 seed 种子号
     """Read --seed or --seed_start"""
     try:
         seed = int(arg)
-        if seed < 0:
+        if seed < 0: # seed < 0 报错 
             raise ValueError('bad seed')
         return seed
 
-    except ValueError:
+    except ValueError:         # 无法转换为整数，报错
         raise argparse.ArgumentTypeError('Bad seed ({}): '
                                          'must be a non-negative integer.'
                                          .format(arg))
 
 
-def parse_args(cwd):
+def parse_args(cwd):          # 创建一个命令行参数解析器，并返回解析后的参数值
     """Create a command line parser.
 
     Returns: The created parser.
     """
     # Parse input arguments
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()    # Python 标准库 argparse 中的一个类，用于创建命令行参数解析器对象
 
     parser.add_argument("--target", type=str, default="rv32imc",
-                        help="Run the generator with pre-defined targets: \
+                        help="Run the generator with pre-defined targets: \     #  --target 使用预定义的目标运行生成器
                             rv32imc, rv32i, rv32imafdc, rv64imc, rv64gc, \
                             rv64imafdc")
     parser.add_argument("-o", "--output", type=str,
-                        help="Output directory name", dest="o")
-    parser.add_argument("-tl", "--testlist", type=str, default="",
+                        help="Output directory name", dest="o")       # --output 输出目录
+    parser.add_argument("-tl", "--testlist", type=str, default="",    # --testlist 回归的测试目录
                         help="Regression testlist", dest="testlist")
-    parser.add_argument("-tn", "--test", type=str, default="all",
+    parser.add_argument("-tn", "--test", type=str, default="all",     # --test testlist 中的 test 或者all
                         help="Test name, 'all' means all tests in the list",
                         dest="test")
-    parser.add_argument("-i", "--iterations", type=int, default=0,
+    parser.add_argument("-i", "--iterations", type=int, default=0,    # --iterations 迭代的次数
                         help="Override the iteration count in the test list",
                         dest="iterations")
-    parser.add_argument("-si", "--simulator", type=str, default="vcs",
+    parser.add_argument("-si", "--simulator", type=str, default="vcs", # --simulator 选择的模拟器 默认VCS
                         help="Simulator used to run the generator, default VCS",
                         dest="simulator")
-    parser.add_argument("--iss", type=str, default="spike",
+    parser.add_argument("--iss", type=str, default="spike",    # --iss 选择的 指令集模拟器
                         help="RISC-V instruction set simulator: spike,ovpsim,sail")
-    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
+    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",    # --verbose  详细的log信息 
                         default=False,
                         help="Verbose logging")
-    parser.add_argument("--co", dest="co", action="store_true", default=False,
+    parser.add_argument("--co", dest="co", action="store_true", default=False,    # --co 仅编译    args.co来获取参数
                         help="Compile the generator only")
-    parser.add_argument("--cov", dest="cov", action="store_true", default=False,
+    parser.add_argument("--cov", dest="cov", action="store_true", default=False,  # --cov  收集覆盖率
                         help="Enable functional coverage")
-    parser.add_argument("--so", dest="so", action="store_true", default=False,
+    parser.add_argument("--so", dest="so", action="store_true", default=False,   # --so  仅仿真
                         help="Simulate the generator only")
-    parser.add_argument("--cmp_opts", type=str, default="",
+    parser.add_argument("--cmp_opts", type=str, default="",       # --cmp_opts 编译选项
                         help="Compile options for the generator")
-    parser.add_argument("--sim_opts", type=str, default="",
+    parser.add_argument("--sim_opts", type=str, default="",       # --sim_opts 仿真选项
                         help="Simulation options for the generator")
-    parser.add_argument("--gcc_opts", type=str, default="",
+    parser.add_argument("--gcc_opts", type=str, default="",       # -- GCC工具链 选项 汇编 -> 二进制
                         help="GCC compile options")
-    parser.add_argument("-s", "--steps", type=str, default="all",
+    parser.add_argument("-s", "--steps", type=str, default="all",  
                         help="Run steps: gen,gcc_compile,iss_sim,iss_cmp",
                         dest="steps")
-    parser.add_argument("--lsf_cmd", type=str, default="",
+                         # gen：生成步骤，可能是用于生成RISC-V汇编代码或测试列表的步骤。
+                         # gcc_compile：使用GCC编译器编译生成的代码。这个步骤将汇编代码转换为可执行的二进制文件。
+                         # iss_sim：ISS模拟器步骤，使用RISC-V指令集模拟器（ISS）来模拟执行编译后的二进制文件。这个步骤将模拟程序在RISC-V处理器上的行为。
+                         # iss_cmp：ISS比较步骤，可能是用于比较模拟器的输出和预期结果的步骤。这个步骤可以用于验证模拟器的正确性和准确性。
+    parser.add_argument("--lsf_cmd", type=str, default="",                # --lsf_cmd 使用集群
                         help="LSF command. Run in local sequentially if lsf \
                             command is not specified")
-    parser.add_argument("--isa", type=str, default="",
+    parser.add_argument("--isa", type=str, default="",                # --isa 指令集的子集
                         help="RISC-V ISA subset")
-    parser.add_argument("-m", "--mabi", type=str, default="",
+    parser.add_argument("-m", "--mabi", type=str, default="",    # --mabi 指令集的mabi
                         help="mabi used for compilation", dest="mabi")
-    parser.add_argument("--gen_timeout", type=int, default=360,
+    parser.add_argument("--gen_timeout", type=int, default=360,      # --gen_timeout timeout
                         help="Generator timeout limit in seconds")
-    parser.add_argument("--end_signature_addr", type=str, default="0",
-                        help="Address that privileged CSR test writes to at EOT")
-    parser.add_argument("--iss_opts", type=str, default="",
+    parser.add_argument("--end_signature_addr", type=str, default="0",    # --end_signature_addr  当测试结束时，程序会将一个特殊的值写入到一个特定的地址，也就是end_signature_addr，以表示测试已经完成
+                        help="Address that privileged CSR test writes to at EOT")  #  在EOT End of Test 时写入特权CSR测试的地址（程序可能会写入一些特定的值到某些地址）
+    parser.add_argument("--iss_opts", type=str, default="",    # 指令集模拟器的选项
                         help="Any ISS command line arguments")
-    parser.add_argument("--iss_timeout", type=int, default=10,
+    parser.add_argument("--iss_timeout", type=int, default=10,  # 指令集模拟器的timeout
                         help="ISS sim timeout limit in seconds")
-    parser.add_argument("--iss_yaml", type=str, default="",
+    parser.add_argument("--iss_yaml", type=str, default="",        # 指令集模拟器的配置文件
                         help="ISS setting YAML")
     parser.add_argument("--simulator_yaml", type=str, default="",
-                        help="RTL/pyflow simulator setting YAML")
-    parser.add_argument("--csr_yaml", type=str, default="",
+                        help="RTL/pyflow simulator setting YAML")    # RTL 和 pyflow 模拟器的配置文件
+    parser.add_argument("--csr_yaml", type=str, default="",          # CSR 的描述文件
                         help="CSR description file")
     parser.add_argument("-ct", "--custom_target", type=str, default="",
-                        help="Directory name of the custom target")
+                        help="Directory name of the custom target")   # 自定义的目标文件名
     parser.add_argument("-cs", "--core_setting_dir", type=str, default="",
-                        help="Path for the riscv_core_setting.sv")
+                        help="Path for the riscv_core_setting.sv")    #  riscv_core_setting.sv 的地址
     parser.add_argument("-ext", "--user_extension_dir", type=str, default="",
-                        help="Path for the user extension directory")
-    parser.add_argument("--asm_test", type=str, default="",
+                        help="Path for the user extension directory")  # 用户自己定义的额外文件夹
+    parser.add_argument("--asm_test", type=str, default="",   # 针对性的汇编测试
                         help="Directed assembly tests")
-    parser.add_argument("--c_test", type=str, default="",
+    parser.add_argument("--c_test", type=str, default="",     # 针对性的C测试
                         help="Directed c tests")
-    parser.add_argument("--log_suffix", type=str, default="",
+    parser.add_argument("--log_suffix", type=str, default="",  # 日志文件的后缀名
                         help="Simulation log name suffix")
-    parser.add_argument("--exp", action="store_true", default=False,
+    parser.add_argument("--exp", action="store_true", default=False,   # 用实验的模拟器进行
                         help="Run generator with experimental features")
     parser.add_argument("-bz", "--batch_size", type=int, default=0,
-                        help="Number of tests to generate per run. You can split a big"
+                        help="Number of tests to generate per run. You can split a big"    # 每次运行时要生成的测试数量， 将大的任务分小
                              " job to small batches with this option")
-    parser.add_argument("--stop_on_first_error", dest="stop_on_first_error",
+    parser.add_argument("--stop_on_first_error", dest="stop_on_first_error",    # 出现第一个错误的时候是否停下
                         action="store_true", default=False,
                         help="Stop on detecting first error")
-    parser.add_argument("--noclean", action="store_true", default=True,
+    parser.add_argument("--noclean", action="store_true", default=True,       # 是否删之前的内容
                         help="Do not clean the output of the previous runs")
-    parser.add_argument("--verilog_style_check", action="store_true",
+    parser.add_argument("--verilog_style_check", action="store_true",             # 启动verilog_style 的检查
                         default=False,
                         help="Run verilog style check")
-    parser.add_argument("-d", "--debug", type=str, default="",
+    parser.add_argument("-d", "--debug", type=str, default="",           # 在log文件中生成debug信息
                         help="Generate debug command log file")
 
-    rsg = parser.add_argument_group('Random seeds',
+    rsg = parser.add_argument_group('Random seeds',                  # 种子号
                                     'To control random seeds, use at most one '
                                     'of the --start_seed, --seed or --seed_yaml '
                                     'arguments. Since the latter two only give '
                                     'a single seed for each test, they imply '
                                     '--iterations=1.')
 
-    rsg.add_argument("--start_seed", type=read_seed,
+    rsg.add_argument("--start_seed", type=read_seed,                # 种子
                      help=("Randomization seed to use for first iteration of "
                            "each test. Subsequent iterations use seeds "
                            "counting up from there. Cannot be used with "
                            "--seed or --seed_yaml."))
-    rsg.add_argument("--seed", type=read_seed,
+    rsg.add_argument("--seed", type=read_seed,              # 种子
                      help=("Randomization seed to use for each test. "
                            "Implies --iterations=1. Cannot be used with "
                            "--start_seed or --seed_yaml."))
-    rsg.add_argument("--seed_yaml", type=str,
+    rsg.add_argument("--seed_yaml", type=str,               # 种子
                      help=("Rerun the generator with the seed specification "
                            "from a prior regression. Implies --iterations=1. "
                            "Cannot be used with --start_seed or --seed."))
 
     args = parser.parse_args()
 
-    if args.seed is not None and args.start_seed is not None:
+    if args.seed is not None and args.start_seed is not None:    # 检测是否重复写了 seed 和 start_seed
         logging.error('--start_seed and --seed are mutually exclusive.')
         sys.exit(RET_FAIL)
 
     if args.seed is not None:
-        if args.iterations == 0:
+        if args.iterations == 0:       # 在指定了--seed选项的情况下，每次测试只会使用一个固定的随机种子，因此将迭代次数设置为1是合理的
             args.iterations = 1
-        elif args.iterations > 1:
+        elif args.iterations > 1:      # --seed选项和--iterations大于1的设置是互斥的，--seed选项的情况下，每次测试将使用一个固定的随机种子，而--iterations大于1意味着要进行多次测试
             logging.error('--seed is incompatible with setting --iterations '
                           'greater than 1.')
             sys.exit(RET_FAIL)
 
     # We've parsed all the arguments from the command line; default values
     # can be set in the config file. Read that here.
-    load_config(args, cwd)
+    load_config(args, cwd)           # load 上述的config
 
     return args
 
 
-def load_config(args, cwd):
+def load_config(args, cwd):    # 从命令行和配置文件中加载配置 
+     # 首先，函数会检查命令行参数args，提取出其中的配置信息。这些信息可能包括要运行的测试类型、测试参数、输出目录等。  
+     # 然后，函数会检查当前工作目录下是否存在配置文件。如果存在，函数会读取配置文件，并提取出其中的配置信息。这些信息可能与命令行参数中的配置信息相互补充或覆盖。
+     # 最后，函数会将命令行参数和配置文件中的配置信息进行合并和验证，生成一个完整的配置字典，并返回给调用者。
     """
   Load configuration from the command line and the configuration file.
   Args:
@@ -912,27 +927,27 @@ def load_config(args, cwd):
   Returns:
       Loaded configuration dictionary.
   """
-    if args.debug:
+    if args.debug:    # 如果有 --debug 则 打开一个文件并 把debug内容写在里面
         args.debug = open(args.debug, "w")
     if not args.csr_yaml:
-        args.csr_yaml = cwd + "/yaml/csr_template.yaml"
+        args.csr_yaml = cwd + "/yaml/csr_template.yaml"    # csr的配置信息文件
 
-    if not args.iss_yaml:
+    if not args.iss_yaml:     # iss的配置信息文件
         args.iss_yaml = cwd + "/yaml/iss.yaml"
 
-    if not args.simulator_yaml:
+    if not args.simulator_yaml:  # VCS这样的 模拟器的配置信息文件
         args.simulator_yaml = cwd + "/yaml/simulator.yaml"
 
     # Keep the core_setting_dir option to be backward compatible, suggest to use
     # --custom_target
-    if args.core_setting_dir:
+    if args.core_setting_dir:      # 说明用户没有指定自定义目标的路径，这时程序会根据其他参数来动态地确定测试列表的路径和核心设置目录的路径
         if not args.custom_target:
             args.custom_target = args.core_setting_dir
     else:
         args.core_setting_dir = args.custom_target
 
     if not args.custom_target:
-        if not args.testlist:
+        if not args.testlist:  # 程序会默认使用当前工作目录下的"target"目录中的对应目标子目录下的"testlist.yaml"文件作为测试列表
             args.testlist = cwd + "/target/" + args.target + "/testlist.yaml"
         if args.simulator == "pyflow":
             args.core_setting_dir = cwd + "/pygen/pygen_src/target/" + args.target
@@ -977,13 +992,13 @@ def load_config(args, cwd):
         else:
             sys.exit("Unsupported pre-defined target: {}".format(args.target))
     else:
-        if re.match(".*gcc_compile.*", args.steps) or re.match(".*iss_sim.*",
+        if re.match(".*gcc_compile.*", args.steps) or re.match(".*iss_sim.*",    # 测试步骤中包含了编译或模拟器执行的步骤
                                                                args.steps):
-            if (not args.mabi) or (not args.isa):
+            if (not args.mabi) or (not args.isa):            # 其中一个为空，说明用户没有指定自定义目标的MABI（Machine ABI）或ISA（Instruction Set Architecture），这时程序会打印一条错误信息并退出
                 sys.exit(
                     "mabi and isa must be specified for custom target {}".format(
                         args.custom_target))
-        if not args.testlist:
+        if not args.testlist:      # 如果没有指定测试列表的路径，程序会默认使用自定义目标目录下的"testlist.yaml"文件作为测试列表。
             args.testlist = args.custom_target + "/testlist.yaml"
 
 
@@ -991,44 +1006,44 @@ def main():
     """This is the main entry point."""
     try:
         cwd = os.path.dirname(os.path.realpath(__file__))
-        os.environ["RISCV_DV_ROOT"] = cwd
+        os.environ["RISCV_DV_ROOT"] = cwd    #其他地方可以通过os.environ.get("RISCV_DV_ROOT")来获取当前工作目录的路径
 
-        args = parse_args(cwd)
-        setup_logging(args.verbose)
+        args = parse_args(cwd)         # 获取 命令行的-- 配置
+        setup_logging(args.verbose)    # 根据命令行的verbose 建立log文件
 
         # Create output directory
-        output_dir = create_output(args.o, args.noclean)
+        output_dir = create_output(args.o, args.noclean)    # 建立输出的文件目录
 
-        if args.verilog_style_check:
+        if args.verilog_style_check:                    #  如果有verilog_style 检查 ，调用 shell 运行：verilog_style/run.sh， 如果有返回值，则报错
             logging.debug("Run style check")
             style_err = run_cmd("verilog_style/run.sh")
             if style_err: logging.info(
                 "Found style error: \nERROR: " + style_err)
 
         # Run any handcoded/directed assembly tests specified by args.asm_test
-        if args.asm_test != "":
-            asm_test = args.asm_test.split(',')
+        if args.asm_test != "":                       # 是否为空字符串，如果不为空，表示需要执行定向汇编测试
+            asm_test = args.asm_test.split(',')       # 将args.asm_test路径按逗号分隔成一个列表，保存在asm_test变量中
             for path_asm_test in asm_test:
-                full_path = os.path.expanduser(path_asm_test)
+                full_path = os.path.expanduser(path_asm_test)  # os.path.expanduser(path_asm_test)将相对路径转换为绝对路径，并保存在full_path变量中
                 # path_asm_test is a directory
-                if os.path.isdir(full_path):
+                if os.path.isdir(full_path):          # 如果是目录，调用run_assembly_from_dir函数来执行该目录下的所有汇编测试
                     run_assembly_from_dir(full_path, args.iss_yaml, args.isa,
                                           args.mabi,
                                           args.gcc_opts, args.iss, output_dir,
                                           args.core_setting_dir, args.debug)
                 # path_asm_test is an assembly file
-                elif os.path.isfile(full_path) or args.debug:
+                elif os.path.isfile(full_path) or args.debug:    # 如果是汇编文件，或者当前处于调试模式（args.debug为True），调用run_assembly函数来执行该汇编文件
                     run_assembly(full_path, args.iss_yaml, args.isa, args.mabi,
                                  args.gcc_opts,
                                  args.iss, output_dir, args.core_setting_dir,
                                  args.debug)
-                else:
+                else:        # 既不是一个目录也不是一个汇编文件，说明指定的路径不存在
                     logging.error('{} does not exist'.format(full_path))
                     sys.exit(RET_FAIL)
             return
 
         # Run any handcoded/directed c tests specified by args.c_test
-        if args.c_test != "":
+        if args.c_test != "":              # 同上一样，用的是c测试
             c_test = args.c_test.split(',')
             for path_c_test in c_test:
                 full_path = os.path.expanduser(path_c_test)
@@ -1049,20 +1064,20 @@ def main():
                     sys.exit(RET_FAIL)
             return
 
-        run_cmd_output(["mkdir", "-p", ("{}/asm_test".format(output_dir))])
+        run_cmd_output(["mkdir", "-p", ("{}/asm_test".format(output_dir))])     # 建立一个文件夹
         # Process regression test list
-        matched_list = []
-        # Any tests in the YAML test list that specify a directed assembly test
-        asm_directed_list = []
+        matched_list = []   # 用于记录与指定条件匹配的测试列表
+        # Any tests in the YAML test list that specify a directed assembly test  
+        asm_directed_list = []   # 定向汇编测试的测试列表
         # Any tests in the YAML test list that specify a directed c test
-        c_directed_list = []
+        c_directed_list = []  # 用于记录指定了定向C测试的测试列表
 
-        if not args.co:
-            process_regression_list(args.testlist, args.test, args.iterations,
+        if not args.co:        # 如果不是仅编译，则
+            process_regression_list(args.testlist, args.test, args.iterations,   # 从回归测试列表中获取匹配的测试
                                     matched_list, cwd)
             for t in list(matched_list):
                 # Check mutual exclusive between gen_test, asm_test, and c_test
-                if 'asm_test' in t:
+                if 'asm_test' in t:                # 如果是汇编测试
                     if 'gen_test' in t or 'c_test' in t:
                         logging.error(
                             'asm_test must not be defined in the testlist '
@@ -1071,7 +1086,7 @@ def main():
                     asm_directed_list.append(t)
                     matched_list.remove(t)
 
-                if 'c_test' in t:
+                if 'c_test' in t:      # 如果是c测试
                     if 'gen_test' in t or 'asm_test' in t:
                         logging.error(
                             'c_test must not be defined in the testlist '
@@ -1080,22 +1095,22 @@ def main():
                     c_directed_list.append(t)
                     matched_list.remove(t)
 
-            if len(matched_list) == 0 and len(asm_directed_list) == 0 and len(
+            if len(matched_list) == 0 and len(asm_directed_list) == 0 and len(      # 找不到测试
                     c_directed_list) == 0:
                 sys.exit("Cannot find {} in {}".format(args.test, args.testlist))
 
-        # Run instruction generator
-        if args.steps == "all" or re.match(".*gen.*", args.steps):
-            # Run any handcoded/directed assembly tests specified in YAML format
-            if len(asm_directed_list) != 0:
+        # Run instruction generator         运行随机指令发生器
+        if args.steps == "all" or re.match(".*gen.*", args.steps):    # 在步骤里有gen的选项
+            # Run any handcoded/directed assembly tests specified in YAML format   #  运行以 YAML 格式指定的任何手写/定向汇编测试。
+            if len(asm_directed_list) != 0:           # 定向汇编测试列表不为0
                 for test_entry in asm_directed_list:
-                    gcc_opts = args.gcc_opts
+                    gcc_opts = args.gcc_opts           # 加一些选项
                     gcc_opts += test_entry.get('gcc_opts', '')
                     path_asm_test = os.path.expanduser(
-                        test_entry.get('asm_test'))
+                        test_entry.get('asm_test'))     
                     if path_asm_test:
                         # path_asm_test is a directory
-                        if os.path.isdir(path_asm_test):
+                        if os.path.isdir(path_asm_test):      # 目录的跑
                             run_assembly_from_dir(path_asm_test, args.iss_yaml,
                                                   args.isa, args.mabi,
                                                   gcc_opts, args.iss,
@@ -1103,19 +1118,19 @@ def main():
                                                   args.core_setting_dir,
                                                   args.debug)
                         # path_asm_test is an assembly file
-                        elif os.path.isfile(path_asm_test):
+                        elif os.path.isfile(path_asm_test):   # 文件的跑
                             run_assembly(path_asm_test, args.iss_yaml, args.isa,
                                          args.mabi, gcc_opts,
                                          args.iss, output_dir,
                                          args.core_setting_dir, args.debug)
-                        else:
+                        else:     # 否则报错
                             if not args.debug:
                                 logging.error(
                                     '{} does not exist'.format(path_asm_test))
                                 sys.exit(RET_FAIL)
 
             # Run any handcoded/directed C tests specified in YAML format
-            if len(c_directed_list) != 0:
+            if len(c_directed_list) != 0:      # 同上  c测试
                 for test_entry in c_directed_list:
                     gcc_opts = args.gcc_opts
                     gcc_opts += test_entry.get('gcc_opts', '')
@@ -1139,29 +1154,29 @@ def main():
                                 sys.exit(RET_FAIL)
 
             # Run remaining tests using the instruction generator
-            gen(matched_list, args, output_dir, cwd)
+            gen(matched_list, args, output_dir, cwd)   # 运行指令发生器
 
-        if not args.co:
-            # Compile the assembly program to ELF, convert to plain binary
+        if not args.co:    # 不是仅编译
+            # Compile the assembly program to ELF, convert to plain binary   将汇编程序编译为 ELF 格式，转换为纯二进制格式。使用RISC-V GCC工具链编译汇编
             if args.steps == "all" or re.match(".*gcc_compile.*", args.steps):
                 gcc_compile(matched_list, output_dir, args.isa, args.mabi,
                             args.gcc_opts, args.debug)
 
-            # Run ISS simulation
-            if args.steps == "all" or re.match(".*iss_sim.*", args.steps):
+            # Run ISS simulation   使用 模拟器进行仿真
+            if args.steps == "all" or re.match(".*iss_sim.*", args.steps):    
                 iss_sim(matched_list, output_dir, args.iss, args.iss_yaml,
                         args.iss_opts,
                         args.isa, args.core_setting_dir, args.iss_timeout,
                         args.debug)
 
-            # Compare ISS simulation result
+            # Compare ISS simulation result    进行仿真结果的比对
             if args.steps == "all" or re.match(".*iss_cmp.*", args.steps):
                 iss_cmp(matched_list, args.iss, output_dir,
                         args.stop_on_first_error,
                         args.exp, args.debug)
 
-        sys.exit(RET_SUCCESS)
-    except KeyboardInterrupt:
+        sys.exit(RET_SUCCESS)    # 程序退出
+    except KeyboardInterrupt:   # ctrl-c 退出
         logging.info("\nExited Ctrl-C from user request.")
         sys.exit(130)
 
