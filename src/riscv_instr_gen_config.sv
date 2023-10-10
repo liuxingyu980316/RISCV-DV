@@ -15,7 +15,7 @@
  */
 
 //-----------------------------------------------------------------------------
-// RISC-V assembly program generator configuration class
+// RISC-V assembly program generator configuration class  配置
 //-----------------------------------------------------------------------------
 
 class riscv_instr_gen_config extends uvm_object;
@@ -24,256 +24,295 @@ class riscv_instr_gen_config extends uvm_object;
   // Random instruction generation settings
   //-----------------------------------------------------------------------------
 
-  // Instruction count of the main program
+  // Instruction count of the main program       主程序的指令数
   rand int               main_program_instr_cnt;
 
-  // Instruction count of each sub-program
+  // Instruction count of each sub-program       子程序的指令数
   rand int               sub_program_instr_cnt[];
 
-  // Instruction count of the debug rom
+  // Instruction count of the debug rom         调试 rom的指令数
   rand int               debug_program_instr_cnt;
 
-  // Instruction count of debug sub-programs
+  // Instruction count of debug sub-programs    调试子程序的指令数
   rand int               debug_sub_program_instr_cnt[];
 
-  // Pattern of data section: RAND_DATA, ALL_ZERO, INCR_VAL
+  // Pattern of data section: RAND_DATA, ALL_ZERO, INCR_VAL  数据段的模式 随机 全零 递增
   rand data_pattern_t    data_page_pattern;
 
-  // Initialization of the vregs
-  // SAME_VALUES_ALL_ELEMS - Using vmv.v.x to fill all the elements of the vreg with the same value as the one in the GPR selected
-  // RANDOM_VALUES_VMV     - Using vmv.v.x + vslide1up.vx to randomize the contents of each vector element
-  // RANDOM_VALUES_LOAD    - Using vle.v, same approach as RANDOM_VALUES_VMV but more efficient for big VLEN
-  vreg_init_method_t     vreg_init_method = RANDOM_VALUES_VMV;
+  // Initialization of the vregs  初始化vreg是指向量寄存器
+  // SAME_VALUES_ALL_ELEMS - Using vmv.v.x to fill all the elements of the vreg with the same value as the one in the GPR selected   vreg的元素填充为与所选通用寄存器（GPR）中相同的值，通常用于测试程序在处理重复输入时的行为，或者用于重置或初始化vreg的内容
+  // RANDOM_VALUES_VMV     - Using vmv.v.x + vslide1up.vx to randomize the contents of each vector element    vmv.v.x指令和vslide1up.vx指令的组合来随机化每个矢量元素的内容。这种初始化模式通常用于模拟真实环境中的随机数据，以测试程序在处理随机输入时的行为
+  // RANDOM_VALUES_LOAD    - Using vle.v, same approach as RANDOM_VALUES_VMV but more efficient for big VLEN   使用vle.v指令来加载随机化的数据到vreg中。这种初始化模式与RANDOM_VALUES_VMV相同，但更适合于处理大的向量长度（VLEN），因为它可以更高效地加载数据到vreg中
+  
+  vreg_init_method_t     vreg_init_method = RANDOM_VALUES_VMV;    // 默认的向量寄存器的初始化是随机的模式
 
-  // Associate array for delegation configuration for each exception and interrupt
-  // When the bit is 1, the corresponding delegation is enabled.
-  rand bit               m_mode_exception_delegation[exception_cause_t];
-  rand bit               s_mode_exception_delegation[exception_cause_t];
-  rand bit               m_mode_interrupt_delegation[interrupt_cause_t];
-  rand bit               s_mode_interrupt_delegation[interrupt_cause_t];
+  // Associate array for delegation configuration for each exception and interrupt    用于每个异常和中断的委托配置的关联数组  用于表示委托是否被启用（1表示启用，0表示禁用）
+  // When the bit is 1, the corresponding delegation is enabled.    当位为1时，相应的委托被启用。 在计算机科学和编程中，委托是指将某个任务或操作的执行权力交给另一个实体或模块的行为。在异常和中断处理中，委托通常涉及到将异常或中断的处理权力交给不同的模式（如机器模式或用户模式）或不同的处理程序。
+  rand bit               m_mode_exception_delegation[exception_cause_t];  用于配置机器模式（M-mode）异常
+  rand bit               s_mode_exception_delegation[exception_cause_t];  监督模式（S-mode）异常
+  rand bit               m_mode_interrupt_delegation[interrupt_cause_t];  用于配置机器模式（M-mode）中断
+  rand bit               s_mode_interrupt_delegation[interrupt_cause_t];  监督模式（S-mode）中断
 
-  // Priviledged mode after boot
+  // Priviledged mode after boot  可以在测试或模拟中随机生成不同的特权模式和寄存器设置，以测试程序在不同特权模式下的行为。
+  // 特权模式是指操作系统或内核拥有的特殊权限和访问级别,在RISC-V架构中，特权模式分为不同的级别，如机器模式（M-mode）、监督模式（S-mode）和用户模式（U-mode）    USER_MODE = 0b00 SUPERVISOR_MODE = 0b01  RESERVED_MODE = 0b10
   rand privileged_mode_t init_privileged_mode;
 
-  rand bit[XLEN-1:0]     mstatus, mie,
+  rand bit[XLEN-1:0]     mstatus, mie,    // 表示不同特权模式下的状态和控制寄存器
                          sstatus, sie,
                          ustatus, uie;
 
   // Key fields in xSTATUS
-  // Memory protection bits
-  rand bit               mstatus_mprv;
-  rand bit               mstatus_mxr;
-  rand bit               mstatus_sum;
-  rand bit               mstatus_tvm;
-  rand bit [1:0]         mstatus_fs;
-  rand bit [1:0]         mstatus_vs;
-  rand mtvec_mode_t      mtvec_mode;
+  // Memory protection bits   用于存储有关处理器状态和异常处理的信息
+  rand bit               mstatus_mprv;   // 该位表示是否启用内存保护。当设置为1时，内存保护被启用，处理器将执行内存访问权限检查。进入内存
+  rand bit               mstatus_mxr;    // 该位表示是否启用内存执行权限。当设置为1时，处理器将禁止执行从内存中获取的指令。 内存中执行指令
+  rand bit               mstatus_sum;    // 该位表示是否启用用户模式下的内存保护。当设置为1时，用户模式下的内存保护被启用。   确保只使用有权限的内存部分
+  rand bit               mstatus_tvm;    // 该位表示是否启用陷阱向量模式。当设置为1时，处理器将使用陷阱向量表来处理异常和中断。
+  rand bit [1:0]         mstatus_fs;     // 这两个字段分别表示浮点状态的模式。它们用于控制处理器中的浮点操作的行为。
+  rand bit [1:0]         mstatus_vs;     // 这两个字段分别表示向量状态的模式。它们用于控制处理器中向量操作的行为。
+  rand mtvec_mode_t      mtvec_mode;     // 该字段表示陷阱向量表的模式。它用于控制处理器如何访问和处理异常和中断的陷阱向量. 不同的方式解决异常和中断
 
-  // TVEC alignment
-  // This value is the log_2 of the byte-alignment of TVEC.BASE field
-  // As per RISC-V privileged spec, default will be set to 2 (4-byte aligned)
-  rand int tvec_alignment = 2;
+  // TVEC alignment                 根据RISC-V特权规范，默认将设置为2（4字节对齐） 
+  // This value is the log_2 of the byte-alignment of TVEC.BASE field      对齐是指将数据存储在内存中的特定地址，以便于处理器更高效地访问和操作。对齐通常是以2的幂为单位的，比如4字节对齐、8字节对齐等
+  // As per RISC-V privileged spec, default will be set to 2 (4-byte aligned)       通过使用这个随机变量，可以在测试或模拟中随机生成不同的陷阱向量表对齐方式，以测试程序在不同对齐设置下的行为。
+  rand int tvec_alignment = 2; 
 
-  // Floating point rounding mode
-  rand f_rounding_mode_t fcsr_rm;
+  // Floating point rounding mode     浮点舍入的模式
+  rand f_rounding_mode_t fcsr_rm;   //  舍入到最接近的值    向零方向舍入      向下舍入
 
-  // Enable sfence.vma instruction
-  rand bit               enable_sfence;
+  // Enable sfence.vma instruction         负责在操作系统修改内存映射表后，打扫和更新处理器的“记忆”，确保处理器使用的内存映射信息是最新的
+  rand bit               enable_sfence;   //  确保内存访问的一致性和正确性
 
   // Reserved register
-  // Reserved for various hardcoded routines
+  // Reserved for various hardcoded routines    这些寄存器被保留，用于各种硬编码例程的执行。 在程序中有特定的作用，被预留给特定的例程使用。不能被随意改变或用于其他目的
   rand riscv_reg_t       gpr[4];
+  
   // Used by any DCSR operations inside of the debug rom.
-  // Also used by the PMP generation.
-  rand riscv_reg_t       scratch_reg;
+  // Also used by the PMP generation.         同上，预留的一个CSR寄存器
+  rand riscv_reg_t       scratch_reg;           
+  
   // Reg used exclusively by the PMP exception handling routine.
   // Can overlap with the other GPRs used in the random generation,
   // as PMP exception handler is hardcoded and does not include any
-  // random instructions.
-  rand riscv_reg_t       pmp_reg[2];
+  // random instructions.               
+  rand riscv_reg_t       pmp_reg[2];                //   由PMP异常处理例程专用的寄存器
   // Use a random register for stack pointer/thread pointer
-  rand riscv_reg_t       sp;
-  rand riscv_reg_t       tp;
-  rand riscv_reg_t       ra;
+  rand riscv_reg_t       sp;       // 存储堆栈指针
+  rand riscv_reg_t       tp;       // 线程指针
+  rand riscv_reg_t       ra;       // 返回地址
 
   // Options for privileged mode CSR checking
   // Below checking can be made optional as the ISS implementation could be different with the
   // processor.
-  bit                    check_misa_init_val = 1'b0;
-  bit                    check_xstatus = 1'b1;
+  bit                    check_misa_init_val = 1'b0;     // 用于控制特权模式下CSR检查的选项
+  bit                    check_xstatus = 1'b1;           //  用于控制是否检查XSTATUS寄存器的值
 
   // Virtual address translation is on for this test
-  rand bit               virtual_addr_translation_on;
+  rand bit               virtual_addr_translation_on;     //  是否启用，虚拟地址转换是一种将程序使用的虚拟地址转换为实际物理地址的技术
 
   // Vector extension setting
-  rand riscv_vector_cfg  vector_cfg;
+  rand riscv_vector_cfg  vector_cfg;           // 是否启用向量拓展， 一次性地对多个向量进行运算，向量扩展还提供了一些特殊的函数，比如点积、叉积、矩阵乘法等等，这些函数可以大大简化向量的运算
 
-  // PMP configuration settings
+  // PMP configuration settings         // 是否启动PMP（Physical Memory Protection，物理内存保护）
   rand riscv_pmp_cfg pmp_cfg;
 
   //-----------------------------------------------------------------------------
   //  User space memory region and stack setting
+  //  用户空间内存区域和堆栈设置
+  //  在RISC-V架构中，用户空间内存区域和堆栈设置可以通过配置相关的寄存器和内存映射表来实现。
+  //  这些配置可以定义用户空间内存区域的起始地址和大小，以及堆栈的起始地址和大小等。
   //-----------------------------------------------------------------------------
 
-  mem_region_t mem_region[$] = '{
+  mem_region_t mem_region[$] = '{   //  mem_region定义了两个内存区域，分别为region_0和region_1。
+        //    其中，region_0的大小为4096字节，region_1的大小为4096乘以16字节，也就是64KB。xwr表示该内存区域的访问权限，3'b111表示读、写和执行权限都被允许。
     '{name:"region_0", size_in_bytes: 4096,      xwr: 3'b111},
     '{name:"region_1", size_in_bytes: 4096 * 16, xwr: 3'b111}
   };
 
   // Dedicated shared memory region for multi-harts atomic operations
+  //  amo_region定义了一个名为amo_0的内存区域，大小为64字节，xwr同样为3'b111，表示读、写和执行权限都被允许。这个内存区域被用来进行多核之间的原子操作。
   mem_region_t amo_region[$] = '{
     '{name:"amo_0",    size_in_bytes: 64,        xwr: 3'b111}
   };
 
   // Stack section word length
+  // stack_len定义了一个整数类型的变量，表示堆栈的长度为5000个字
   int stack_len = 5000;
 
   //-----------------------------------------------------------------------------
   // Kernel section setting, used by supervisor mode programs
+  // 内核段设置，由监督模式程序使用
+  // 监督模式程序是指运行在RISC-V架构的监督模式下的程序，具有访问和控制系统资源的权限。内核段设置对监督模式程序来说是重要的，因为它决定了内核代码和数据在内存中的位置和访问权限。
   //-----------------------------------------------------------------------------
 
   mem_region_t s_mem_region[$] = '{
+    // 内核内存的大小
     '{name:"s_region_0", size_in_bytes: 4096, xwr: 3'b111},
     '{name:"s_region_1", size_in_bytes: 4096, xwr: 3'b111}};
 
   // Kernel Stack section word length
+     // 内核堆栈的大小
   int kernel_stack_len = 4000;
 
   // Number of instructions for each kernel program
-  int kernel_program_instr_cnt = 400;
-
+  int kernel_program_instr_cnt = 400;    //  每个内核程序的指令数量为400条 
+ 
   // Queue of all the main implemented CSRs that the boot privilege mode cannot access
   // e.g. these CSRs are in higher privilege modes - access should raise an exception
-  privileged_reg_t       invalid_priv_mode_csrs[$];
+  privileged_reg_t       invalid_priv_mode_csrs[$];   //   用于存储所有在启动特权模式下无法访问的主要实现的CSR（控制和状态寄存器）。这些CSR处于更高的特权模式下，如果尝试访问它们应该会引发异常。
 
   //-----------------------------------------------------------------------------
   // Command line options or control knobs
+  // 命令行选项或控制
   //-----------------------------------------------------------------------------
   // Main options for RISC-V assembly program generation
   // Number of sub-programs per test
-  int                    num_of_sub_program = 5;
-  int                    instr_cnt = 200;
-  int                    num_of_tests = 1;
+  int                    num_of_sub_program = 5;        //  控制生成的RISC-V汇编程序中子程序的数量
+  int                    instr_cnt = 200;               //  表示每个子程序的指令数量为200条
+  int                    num_of_tests = 1;              //  表示生成的RISC-V汇编程序的测试数量为1个
   // For tests doesn't involve load/store, the data section generation could be skipped
-  bit                    no_data_page;
+  bit                    no_data_page;                  //  有些测试可能不涉及加载/存储操作,将no_data_page设置为1，以跳过数据页的生成
   // Options to turn off some specific types of instructions
-  bit                    no_branch_jump;     // No branch/jump instruction
-  bit                    no_load_store;      // No load/store instruction
-  bit                    no_csr_instr;       // No csr instruction
-  bit                    no_ebreak = 1;      // No ebreak instruction
+  bit                    no_branch_jump;     // No branch/jump instruction     用于控制是否禁用分支/跳转指令
+  bit                    no_load_store;      // No load/store instruction      控制是否禁用加载/存储指令
+  bit                    no_csr_instr;       // No csr instruction             是否禁用CSR（控制和状态寄存器）指令
+  bit                    no_ebreak = 1;      // No ebreak instruction          是否禁用ebreak指令， ebreak指令用于触发处理器的异常处理机制，默认禁用
   // Only enable ecall if you have overriden the test_done mechanism.
-  bit                    no_ecall = 1;       // No ecall instruction
-  bit                    no_dret = 1;        // No dret instruction
-  bit                    no_fence;           // No fence instruction
-  bit                    no_wfi = 1;         // No WFI instruction
-  bit                    enable_unaligned_load_store;
-  int                    illegal_instr_ratio;
-  int                    hint_instr_ratio;
+  bit                    no_ecall = 1;       // No ecall instruction           是否禁用ecall指令。ecall指令用于触发处理器的系统调用机制，例如调用操作系统的服务。
+  bit                    no_dret = 1;        // No dret instruction            用于控制是否禁用dret指令。dret指令用于从调试异常中返回。如果禁用dret指令，程序将无法从调试异常中返回。
+  bit                    no_fence;           // No fence instruction           用于控制是否禁用fence指令。fence指令用于在内存操作之间插入一个屏障，以确保内存操作的顺序性。如果禁用fence指令，程序将无法保证内存操作的顺序性
+  bit                    no_wfi = 1;         // No WFI instruction             是否禁用WFI（Wait For Interrupt）指令。WFI指令用于使处理器进入低功耗模式，等待中断的发生。如果禁用WFI指令，程序将无法使处理器进入低功耗模式。
+  bit                    enable_unaligned_load_store;                          控制是否启用非对齐的加载/存储操作。在RISC-V架构中，非对齐的加载/存储操作可能会导致异常或错误的行为。如果启用非对齐的加载/存储操作，程序将可以尝试进行非对齐的内存访问。
+  int                    illegal_instr_ratio;                                  用于控制生成的RISC-V汇编程序中非法指令的比例。非法指令是指RISC-V架构不支持的指令。通过调整非法指令的比例，可以测试程序在处理非法指令时的行为和性能。
+  int                    hint_instr_ratio;                                     控制生成的RISC-V汇编程序中提示指令的比例。提示指令是一种对处理器性能有影响的指令，但不一定会改变程序的行为。通过调整提示指令的比例，可以测试程序在不同提示指令下的性能和行为。
   // CSR instruction control
   bit                    gen_all_csrs_by_default = 0; // Generate CSR instructions that use all supported CSRs. Other options below only take effect if this is enabled.
-  bit                    gen_csr_ro_write = 0;        // Generate CSR writes to read-only CSRs
-  privileged_reg_t       add_csr_write[] = {};        // CSRs to add to the set of writeable CSRs
-  privileged_reg_t       remove_csr_write[] = {};     // CSRs to remove from the set of writeable CSRs
-  // Number of harts to be simulated, must be <= NUM_HARTS
+                                                      // 用于控制是否默认生成使用所有支持的CSR的CSR指令。如果启用这个选项，程序将生成使用所有支持的CSR的CSR指令
+  bit                    gen_csr_ro_write = 0;        // Generate CSR writes to read-only CSRs   用于控制是否生成对只读CSR的写操作。在RISC-V架构中，有些CSR是只读的，不允许写操作。如果启用这个选项，程序将尝试生成对只读CSR的写操作
+  privileged_reg_t       add_csr_write[] = {};        // CSRs to add to the set of writeable CSRs   是一个队列，用于添加可写CSR。通过向这个队列中添加CSR，可以生成对这些CSR的写操作。
+  privileged_reg_t       remove_csr_write[] = {};     // CSRs to remove from the set of writeable CSRs    是一个队列，用于从可写CSR中移除CSR。通过向这个队列中添加CSR，可以禁止生成对这些CSR的写操作。
+  // Number of harts to be simulated, must be <= NUM_HARTS   // 控制在模拟中运行的RISC-V硬件线程（hart）的数量
   int                    num_of_harts = NUM_HARTS;
   // Use SP as stack pointer
-  bit                    fix_sp;
+  bit                    fix_sp;                       // 用于控制是否将SP（Stack Pointer）寄存器用作堆栈指针。 在测试或模拟中，可能需要固定使用SP寄存器以确保程序的正确性和一致性。此外，在某些嵌入式系统中，可能也需要固定使用SP寄存器以满足特定的硬件要求。
   // Use push/pop section for data pages
-  bit                    use_push_data_section = 0;
+  bit                    use_push_data_section = 0;    // 用于控制是否使用push/pop段来生成数据页。在生成数据页时，有两种不同的方法：一种是使用直接的数据声明和定义，另一种是使用push/pop段。
   // Directed boot privileged mode, u, m, s
-  string                 boot_mode_opts;
-  int                    enable_page_table_exception;
-  bit                    no_directed_instr;
-  // A name suffix for the generated assembly program
+  string                 boot_mode_opts;             // 可以指定在启动时使用哪种特权模式。
+  int                    enable_page_table_exception;  //  用于控制是否启用页表异常,用于处理内存访问时的页表错误
+  bit                    no_directed_instr;         // 用于控制是否禁用定向指令 
+  // A name suffix for the generated assembly program  // 用于为生成的汇编程序指定一个后缀名
   string                 asm_test_suffix;
   // Enable interrupt bit in MSTATUS (MIE, SIE, UIE)
-  bit                    enable_interrupt;
-  bit                    enable_nested_interrupt;
+  bit                    enable_interrupt;          //  用于控制是否启用中断
+  bit                    enable_nested_interrupt;   //  变量用于控制是否启用嵌套中断。嵌套中断是指在处理一个中断的过程中，又发生了另一个中断。
   // We need a separate control knob for enabling timer interrupts, as Spike
-  // throws an exception if xIE.xTIE is enabled
+  // throws an exception if xIE.xTIE is enabled       //  控制是否启用定时器中断
   bit                    enable_timer_irq;
   // Generate a bare program without any init/exit/error handling/page table routines
   // The generated program can be integrated with a larger program.
-  // Note that the bare mode program is not expected to run in standalone mode
+  // Note that the bare mode program is not expected to run in standalone mode   用于控制是否生成一个裸程序，这个程序中只包含了最基本的指令和数据，没有任何额外的处理代码。裸程序不能独立运行，必须被嵌入到一个完整的程序中才能执行。
   bit                    bare_program_mode;
   // Enable accessing illegal CSR instruction
   // - Accessing non-existence CSR
   // - Accessing CSR with wrong privileged mode
-  bit                    enable_illegal_csr_instruction;
+  bit                    enable_illegal_csr_instruction;    // 控制是否允许访问非法的CSR指令,比如访问不存在的CSR或者在不正确的特权模式下访问CSR
   // Enable accessing CSRs at an invalid privilege level
   bit                    enable_access_invalid_csr_level;
-  // Enable misaligned instruction (caused by JALR instruction)
+  // Enable misaligned instruction (caused by JALR instruction)    // 控制是否允许在无效的特权级别下访问CSR.可以允许在无效的特权级别下访问CSR。这样，程序可以执行一些特殊的操作，比如测试处理器的边界条件或者调试目的
   bit                    enable_misaligned_instr;
-  // Enable some dummy writes to main system CSRs (xSTATUS/xIE) at beginning of test
+  // Enable some dummy writes to main system CSRs (xSTATUS/xIE) at beginning of test   // 用于控制在测试开始时是否对一些主要的系统CSR（xSTATUS/xIE）进行一些虚拟的写入操作
   // to check repeated writes
   bit                    enable_dummy_csr_write;
   bit                    randomize_csr = 0;
   // sfence support
-  bit                    allow_sfence_exception = 0;
+  bit                    allow_sfence_exception = 0;   // 控制是否允许sfence指令产生异常。sfence指令可能会产生异常，比如无效的页表项或者访问权限错误等。
   // Interrupt/Exception Delegation
-  bit                    no_delegation = 1;
-  bit                    force_m_delegation = 0;
-  bit                    force_s_delegation = 0;
-  bit                    support_supervisor_mode;
-  bit                    disable_compressed_instr;
-  // "Memory mapped" address that when written to will indicate some event to
+  bit                    no_delegation = 1;             // 用于控制是否禁用中断/异常委派。在RISC-V架构中，中断/异常委派是一种机制，允许低特权级别的程序处理某些中断/异常。通过将no_delegation设置为1，可以禁用中断/异常委派，使得所有的中断/异常都由最高特权级别的程序处理
+  bit                    force_m_delegation = 0;        // 用于强制将中断/异常委派给机器模式（M）和监督模式（S）。通过将这两个变量设置为1，可以强制将所有的中断/异常都委派给机器模式（M）或监督模式（S）处理，即使某些中断/异常本来应该由更低特权级别的程序处理。
+  bit                    force_s_delegation = 0;        // 同上
+  bit                    support_supervisor_mode;       // 用于控制是否支持监督模式（S）
+  bit                    disable_compressed_instr;      // 控制是否禁用压缩指令
+  // "Memory mapped" address that when written to will indicate some event to    // 用于控制RISC-V汇编程序中一个特殊的“内存映射”地址的行为
   // the testbench - testbench will take action based on the value written
-  bit [XLEN - 1 : 0]     signature_addr = 32'hdead_beef;
-  bit                    require_signature_addr = 1'b0;
-  // Enable a full or empty debug_rom section.
+  bit [XLEN - 1 : 0]     signature_addr = 32'hdead_beef;           //   这个地址被用作一个特殊的标记，当程序向这个地址写入数据时，会触发一些事件或行为
+  bit                    require_signature_addr = 1'b0;            //   用于控制是否需要在程序中强制使用signature_addr,用来确保程序在某些关键点上执行了预期的操作
+  // Enable a full or empty debug_rom section. 
   // Full debug_rom will contain random instruction streams.
-  // Empty debug_rom will contain just dret instruction and will return immediately.
-  // Will be empty by default.
+  // Empty debug_rom will contain just dret instruction and will return immediately.  在RISC-V汇编程序中，debug_rom段是一个特殊的代码段，用于存储调试相关的指令和数据。当程序执行到这个段时，会执行其中的指令并返回结果。
+  // Will be empty by default.        用于控制是否生成一个完整的或空的debug_rom段。
   bit                    gen_debug_section = 1'b0;
   // Enable generation of a directed sequence of instructions containing
-  // ebreak inside the debug_rom.
+  // ebreak inside the debug_rom.       在RISC-V架构中，ebreak指令是一个特殊的指令，用于触发一个异常或中断。当程序执行到这个指令时，会跳转到异常处理程序并执行相应的操作。
   // Disabled by default.
   bit                    enable_ebreak_in_debug_rom = 1'b0;
   // Enable setting dcsr.ebreak(m/s/u)
-  bit                    set_dcsr_ebreak = 1'b0;
-  // Number of sub programs in the debug rom
+  bit                    set_dcsr_ebreak = 1'b0;    // set_dcsr_ebreak，用于控制是否设置dcsr寄存器的ebreak位。中断异常位
+  // Number of sub programs in the debug rom         用于控制在debug_rom段中生成的子程序（sub program）的数量。
   int                    num_debug_sub_program = 0;
-  // Enable debug single stepping
+  // Enable debug single stepping                  //  是否启动单步调试
   bit                    enable_debug_single_step = 0;
   // Number of single stepping iterations
-  rand int               single_step_iterations;
+  rand int               single_step_iterations;     // 单步调试时每一步执行的指令数量
   // Enable mstatus.tw bit - causes u-mode WFI to raise illegal instruction exceptions
-  bit                    set_mstatus_tw;
-  // Enable users to set mstatus.mprv to enable privilege checks on memory accesses.
-  bit                    set_mstatus_mprv;
+  bit                    set_mstatus_tw;            //   mstatus寄存器是一个用于控制处理器状态的特殊寄存器,当tw位被设置为1时，用户模式下的WFI（wait for interrupt 等着什么都不干）指令会触发一个非法指令异常；当tw位被设置为0时，用户模式下的WFI指令会正常执行，不会触发任何异常
+  // Enable users to set mstatus.mprv to enable privilege checks on memory accesses.  // 当mprv位被设置为1时，会启用内存访问的权限检查，即程序在访问内存时需要满足相应的权限要求；当mprv位被设置为0时，不会启用内存访问的权限检查，程序可以自由地访问内存。
+  bit                    set_mstatus_mprv;         //  mstatus寄存器是一个用于控制处理器状态的特殊寄存器。其中的mprv位是一个标志位，用于控制是否启用内存访问的权限检查。
   // Stack space allocated to each program, need to be enough to store necessary context
   // Example: RA, SP, T0
   int                    min_stack_len_per_program = 10 * (XLEN/8);
-  int                    max_stack_len_per_program = 16 * (XLEN/8);
+  int                    max_stack_len_per_program = 16 * (XLEN/8);    // 这意味着每个程序在执行时至少需要分配字节的栈空间来存储必要的上下文信息。以避免栈溢出和内存泄漏
   // Maximum branch distance, avoid skipping large portion of the code
-  int                    max_branch_step = 20;
+  int                    max_branch_step = 20;            // 用于控制程序执行时的最大分支步长.表示程序在执行时允许的最大分支步长为20个指令。分支跳转指令：jal、jalr、beq
   // Maximum directed instruction stream sequence count
-  int                    max_directed_instr_stream_seq = 20;
-  // Reserved registers
+  int                    max_directed_instr_stream_seq = 20;   // 执行时的最大指令流序列计数,一组连续的指令，它们按照顺序执行并且没有任何分支或跳转
+  // Reserved registers    用于存储RISC-V架构中保留的寄存器
+  // 在RISC-V架构中，有一些特殊的寄存器被保留用于特定的用途，例如zero、ra、sp、gp、tp、t0、t1、t2、s0、s1等。这些寄存器在程序执行过程中扮演着重要的角色，不能被普通的指令修改或访问。程序初始化时可以将它们的值预加载到reserved_regs数组,后续直接使用即可
   riscv_reg_t            reserved_regs[];
   // Floating point support
-  bit                    enable_floating_point;
+  bit                    enable_floating_point;     // 用于控制是否启用RISC-V架构中的浮点支持
   // Vector extension support
-  bit                    enable_vector_extension;
+  bit                    enable_vector_extension;   // 控制是否启用RISC-V架构中的向量扩展支持。
   // Only generate vector instructions
-  bit                    vector_instr_only;
+  bit                    vector_instr_only;         //  控制是否只生成向量指令
   // Bit manipulation extension support
   bit                    enable_b_extension;
 
-  bit                    enable_zba_extension;
+  bit                    enable_zba_extension;      // 控制是否支持位拓展
   bit                    enable_zbb_extension;
   bit                    enable_zbc_extension;
   bit                    enable_zbs_extension;
 
   b_ext_group_t          enable_bitmanip_groups[] = {ZBB, ZBS, ZBP, ZBE, ZBF, ZBC, ZBR, ZBM, ZBT,
                                                      ZB_TMP};
+  // ZBB：位块复制（Bit Block Copy）指令组，用于复制一个位块到另一个位块。
+  // ZBS：位块设置（Bit Block Set）指令组，用于设置一个位块中的所有位为1。
+  // ZBP：位块反转（Bit Block Inverse）指令组，用于反转一个位块中的所有位。
+  // ZBE：位块清除（Bit Block Clear）指令组，用于清除一个位块中的所有位。
+  // ZBF：位块查找（Bit Block Find）指令组，用于在一个位块中查找第一个设置的位。
+  // ZBC：位块计数（Bit Block Count）指令组，用于统计一个位块中设置的位的数量。
+  // ZBR：位块反转并复制（Bit Block Reverse and Copy）指令组，用于反转并复制一个位块。
+  // ZBM：位块合并（Bit Block Merge）指令组，用于合并两个位块。
+  // ZBT：位块测试（Bit Block Test）指令组，用于测试一个位块中的特定位。
+  // ZB_TMP：临时位操作扩展指令组，用于存储临时的位操作扩展指令。
 
   //-----------------------------------------------------------------------------
   // Command line options for instruction distribution control
   //-----------------------------------------------------------------------------
-  int                    dist_control_mode;
-  int unsigned           category_dist[riscv_instr_category_t];
+  int                    dist_control_mode;    //   控制指令分布的控制模式和每个指令类别的分布比例  均匀分布 正态分布  自定义分布
+  int unsigned           category_dist[riscv_instr_category_t]; category_dist数组用于存储每个指令类别的分布比例
 
+  // 假设riscv_instr_category_t枚举类型定义了以下指令类别：
+  // typedef enum {  
+  // RISCV_INSTR_CATEGORY_LOAD,  
+  // RISCV_INSTR_CATEGORY_STORE,  
+  // RISCV_INSTR_CATEGORY_BRANCH,  
+  // } riscv_instr_category_t;
+  
+  // int unsigned category_dist[riscv_instr_category_t] = {  
+  // 2,                 // LOAD    权重为2
+  // 2,                 // STORE   权重为2
+  // 1,                 // BRANCH  权重为1
+  // };
 
   constraint default_c {
     sub_program_instr_cnt.size() == num_of_sub_program;
