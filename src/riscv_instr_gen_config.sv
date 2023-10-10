@@ -315,19 +315,19 @@ class riscv_instr_gen_config extends uvm_object;
   // };
 
   constraint default_c {
-    sub_program_instr_cnt.size() == num_of_sub_program;
-    debug_sub_program_instr_cnt.size() == num_debug_sub_program;
-    main_program_instr_cnt inside {[10 : instr_cnt]};
+    sub_program_instr_cnt.size() == num_of_sub_program;                  // 子程序的数量，默认5
+    debug_sub_program_instr_cnt.size() == num_debug_sub_program;         // debug下的子程序的数量，默认0
+    main_program_instr_cnt inside {[10 : instr_cnt]};      // 每个子程序的指令数量，默认 10 - 100 
     foreach(sub_program_instr_cnt[i]) {
-      sub_program_instr_cnt[i] inside {[10 : instr_cnt]};
+      sub_program_instr_cnt[i] inside {[10 : instr_cnt]};  // 每个debug子程序的指令数量，默认 10 - 100 
     }
     // Disable sfence if the program is not boot to supervisor mode
     // If sfence exception is allowed, we can enable sfence instruction in any priviledged mode.
     // When MSTATUS.TVM is set, executing sfence.vma will be treate as illegal instruction
-    if(allow_sfence_exception) {
-      enable_sfence == 1'b1;
-      (init_privileged_mode != SUPERVISOR_MODE) || (mstatus_tvm == 1'b1);
-    } else {
+      if(allow_sfence_exception) {             //是否允许sfence指令产生异常
+      enable_sfence == 1'b1;                   // 打开 sfence异常的产生
+        (init_privileged_mode != SUPERVISOR_MODE) || (mstatus_tvm == 1'b1);    //  在任何特权模式下启用 sfence 指令
+      } else {             //   MSTATUS.TVM 被设置时，执行 sfence.vma 将被视为非法指令
       (init_privileged_mode != SUPERVISOR_MODE || !riscv_instr_pkg::support_sfence || mstatus_tvm
           || no_fence) -> (enable_sfence == 1'b0);
     }
