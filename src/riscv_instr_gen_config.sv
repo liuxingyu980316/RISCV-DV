@@ -30,7 +30,7 @@ class riscv_instr_gen_config extends uvm_object;
   // Instruction count of each sub-program       子程序的指令数
   rand int               sub_program_instr_cnt[];
 
-  // Instruction count of the debug rom         调试 rom的指令数
+  // Instruction count of the debug rom         调试模式下的指令数
   rand int               debug_program_instr_cnt;
 
   // Instruction count of debug sub-programs    调试子程序的指令数
@@ -314,7 +314,7 @@ class riscv_instr_gen_config extends uvm_object;
   // 1,                 // BRANCH  权重为1
   // };
 
-  constraint default_c {
+  constraint default_c {    // 子程序数量 and sfence
     sub_program_instr_cnt.size() == num_of_sub_program;                  // 子程序的数量，默认5
     debug_sub_program_instr_cnt.size() == num_debug_sub_program;         // debug下的子程序的数量，默认0
     main_program_instr_cnt inside {[10 : instr_cnt]};      // 每个子程序的指令数量，默认 10 - 100 
@@ -333,40 +333,40 @@ class riscv_instr_gen_config extends uvm_object;
     }
   }
 
-  constraint debug_mode_c {
+        constraint debug_mode_c {    // 限制调试模式下的指令数  和  子程序 主程序中的指令数量
       if (riscv_instr_pkg::support_debug_mode) {
-        debug_program_instr_cnt inside {[100 : 300]};
+        debug_program_instr_cnt inside {[100 : 300]};     // 指令数量
         foreach(debug_sub_program_instr_cnt[i]) {
-          debug_sub_program_instr_cnt[i] inside {[100 : 300]};
+          debug_sub_program_instr_cnt[i] inside {[100 : 300]};  // 子程序下的指令数
         }
       }
     `ifndef DSIM
-       main_program_instr_cnt + sub_program_instr_cnt.sum() == instr_cnt;
+          main_program_instr_cnt + sub_program_instr_cnt.sum() == instr_cnt;   // 如果定义了 DSIM 每个主程序的指令数量 + 每个子程序的指令数量 == 总的指令数量
     `else
        // dsim has some issue supporting sum(), use some approximate constraint to generate
        // instruction cnt
-       if (num_of_sub_program > 0) {
-         main_program_instr_cnt inside {[10:instr_cnt/2]};
+        if (num_of_sub_program > 0) {    //  如果有子程序
+          main_program_instr_cnt inside {[10:instr_cnt/2]};  主程序的指令数量
          foreach (sub_program_instr_cnt[i]) {
-           sub_program_instr_cnt[i] inside {[10:instr_cnt/num_of_sub_program]};
+           sub_program_instr_cnt[i] inside {[10:instr_cnt/num_of_sub_program]};     子程序的指令数量
          }
        } else {
-         main_program_instr_cnt == instr_cnt;
+         main_program_instr_cnt == instr_cnt;   // 如果没有子程序，指令数量都给主程序
        }
     `endif
   }
 
   // Keep the number of single step iterations relatively small
-  constraint debug_single_step_c {
+         constraint debug_single_step_c {    // 单步调试中每一个步骤中的指令数量
     if (enable_debug_single_step) {
       single_step_iterations inside {[10 : 50]};  // 单步调试的时候每一个步里面的指令数量
     }
   }
 
   // Boot privileged mode distribution
-  constraint boot_privileged_mode_dist_c {
+      constraint boot_privileged_mode_dist_c {     //   用于限制启动特权模式的分布
     // Boot to higher privileged mode more often
-    if(riscv_instr_pkg::supported_privileged_mode.size() == 2) {
+        if(riscv_instr_pkg::supported_privileged_mode.size() == 2) {     // 获取支持的特权模式数量。根据支持的特权模式数量，设置不同的启动特权模式分布
       init_privileged_mode dist {riscv_instr_pkg::supported_privileged_mode[0] := 6,
                                  riscv_instr_pkg::supported_privileged_mode[1] := 4};
     } else if (riscv_instr_pkg::supported_privileged_mode.size() == 3) {
@@ -374,14 +374,14 @@ class riscv_instr_gen_config extends uvm_object;
                                  riscv_instr_pkg::supported_privileged_mode[1] := 3,
                                  riscv_instr_pkg::supported_privileged_mode[2] := 3};
     } else {
-      init_privileged_mode == riscv_instr_pkg::supported_privileged_mode[0];
+          init_privileged_mode == riscv_instr_pkg::supported_privileged_mode[0];   // ==1 
     }
   }
 
-  constraint mtvec_c {
-    mtvec_mode inside {supported_interrupt_mode};
+          constraint mtvec_c {  // mtvec寄存器用于设置中断向量表的基址和模式，tvec_alignment表示中断向量表的对齐要求
+            mtvec_mode inside {supported_interrupt_mode};    // mtvec_mode的取值必须在supported_interrupt_mode所支持的中断模式范围内
     if (mtvec_mode == DIRECT) {
-     soft tvec_alignment == 2;
+     soft tvec_alignment == 2;           // tvec_alignment表示中断向量表的对齐要求
     } else {
      // Setting MODE = Vectored may impose an additional alignmentconstraint on BASE,
      // requiring up to 4×XLEN-byte alignment
@@ -389,35 +389,36 @@ class riscv_instr_gen_config extends uvm_object;
     }
   }
 
-  constraint mstatus_c {
-    if (set_mstatus_mprv) {
+      constraint mstatus_c {     // 用于限制mstatus寄存器的取值范围
+        if (set_mstatus_mprv) {     // 控制是否启用内存访问的权限
       mstatus_mprv == 1'b1;
     } else {
       mstatus_mprv == 1'b0;
     }
-    if (SATP_MODE == BARE) {
-      mstatus_mxr == 0;
-      mstatus_sum == 0;
-      mstatus_tvm == 0;
+          if (SATP_MODE == BARE) {  // BARE模式表示不启用虚拟化，也不进行任何地址转换或保护检查。在这种模式下，直接访问物理内存，不进行任何转换或保护。
+      mstatus_mxr == 0;   // 该位控制内存执行权限。当mxr位为0时，禁止执行从内存加载的指令。这是为了防止恶意软件通过在内存中插入恶意指令并执行它们来攻击系统。
+      mstatus_sum == 0;   // 该位控制用户模式下内存访问权限。当sum位为0时，用户模式下禁止访问Supervisor模式下可访问的内存区域。这是为了防止用户程序意外或恶意地访问不应该访问的内存区域。
+      mstatus_tvm == 0;   // 该位控制虚拟化模式。当tvm位为0时，禁用虚拟化模式，即不允许执行虚拟机中的指令。这是为了防止虚拟机中的恶意软件通过执行特权指令来攻击宿主系统。
     }
   }
 
   // Exception delegation setting
-  constraint exception_delegation_c {
+            constraint exception_delegation_c {     // 异常处理的方式
     // Do not delegate instructino page fault to supervisor/user mode because this may introduce
     // dead loop. All the subsequent instruction fetches may fail and program cannot recover.
-    m_mode_exception_delegation[INSTRUCTION_PAGE_FAULT] == 1'b0;
-    if(force_m_delegation) {
-      foreach(m_mode_exception_delegation[i]) {
-        soft m_mode_exception_delegation[i] == 1'b1;
+    m_mode_exception_delegation[INSTRUCTION_PAGE_FAULT] == 1'b0;  // 配置机器模式M 的指令页故障异常 要求不将指令页故障异常委托给Supervisor/User模式，因为这可能会导致死循环。
+        //  如果程序在取指时发生页故障，并且该异常被委托给Supervisor/User模式处理，那么由于页故障未解决，后续的所有指令取指都可能失败，程序无法恢复。
+    if(force_m_delegation) {    // 如果出现异常就委派给 机器模式解决
+      foreach(m_mode_exception_delegation[i]) { 
+        soft m_mode_exception_delegation[i] == 1'b1;   // 就把 异常都交给机器模式解决
       }
       foreach(m_mode_interrupt_delegation[i]) {
         soft m_mode_interrupt_delegation[i] == 1'b1;
       }
     }
-    if(force_s_delegation) {
+        if(force_s_delegation) {   // 如果出现异常就委派给 Supervisor模式解决
       foreach(s_mode_exception_delegation[i]) {
-        soft s_mode_exception_delegation[i] == 1'b1;
+        soft s_mode_exception_delegation[i] == 1'b1;     // 就把 异常都交给Supervisor模式解决
       }
       foreach(s_mode_interrupt_delegation[i]) {
         soft s_mode_interrupt_delegation[i] == 1'b1;
@@ -429,16 +430,16 @@ class riscv_instr_gen_config extends uvm_object;
   // You can modify this constraint if your ISS support different set of delegations
   constraint delegation_c {
     foreach(m_mode_exception_delegation[i]) {
-      if(!support_supervisor_mode || no_delegation) {
+      if(!support_supervisor_mode || no_delegation) {        // 不支持Supervisor模式或者禁用了委托，则要求所有的取值都为0，即将所有异常和中断都不委托给任何模式处理。
         m_mode_exception_delegation[i] == 0;
       }
-      if(!(i inside {INSTRUCTION_ADDRESS_MISALIGNED, BREAKPOINT, ECALL_UMODE,
+        if(!(i inside {INSTRUCTION_ADDRESS_MISALIGNED, BREAKPOINT, ECALL_UMODE,    //   是否在支持的委托集合中，即不支持将该异常或中断委托给任何模式处理
                      INSTRUCTION_PAGE_FAULT, LOAD_PAGE_FAULT, STORE_AMO_PAGE_FAULT})) {
         m_mode_exception_delegation[i] == 0;
       }
     }
     foreach(m_mode_interrupt_delegation[i]) {
-      if(!support_supervisor_mode || no_delegation) {
+      if(!support_supervisor_mode || no_delegation) {       // 同上，这是中断
         m_mode_interrupt_delegation[i] == 0;
       }
       if(!(i inside {S_SOFTWARE_INTR, S_TIMER_INTR, S_EXTERNAL_INTR})) {
@@ -448,68 +449,68 @@ class riscv_instr_gen_config extends uvm_object;
   }
 
   constraint ra_c {
-    ra dist {RA := 3, T1 := 2, [SP:T0] :/ 1, [T2:T6] :/ 4};
-    ra != sp;
-    ra != tp;
-    ra != ZERO;
+    ra dist {RA := 3, T1 := 2, [SP:T0] :/ 1, [T2:T6] :/ 4};  // 定义了ra寄存器的分布概率。其中，RA表示返回地址寄存器，T1表示临时寄存器，SP表示栈指针寄存器，T0表示临时寄存器，[T2:T6]表示一组临时寄存器。
+    ra != sp;      // 栈指针寄存器  Stack Pointer
+    ra != tp;      // 线程指针寄存器  thread pointer
+    ra != ZERO;    // 零寄存器
   }
 
   constraint sp_tp_c {
-    if (fix_sp) {
-      sp == SP;
+    if (fix_sp) {    // 固定sp fix_sp为true，则要求sp寄存器的取值等于SP寄存器的取值。这是为了在某些情况下，固定sp寄存器的取值，以避免程序错误或崩溃。
+      sp == SP;  
     }
     sp != tp;
-    !(sp inside {GP, RA, ZERO});
+    !(sp inside {GP, RA, ZERO});   // sp和tp寄存器的取值不能等于GP、RA和ZERO寄存器的取值。 gp Global Pointer全局指针寄存器，用于保存全局数据的基地址  ra Return Address 返回地址寄存器，用于保存函数调用的返回地址
     !(tp inside {GP, RA, ZERO});
   }
 
-  // This reg is used in various places throughout the generator,
-  // so need more conservative constraints on it.
+  // This reg is used in various places throughout the generator,    擦除寄存器（Scratch Register）的缩写，是一种特殊用途的寄存器，通常用于暂时存储数据或地址信息，以支持程序的执行
+  // so need more conservative constraints on it. 
   constraint reserve_scratch_reg_c {
     !(scratch_reg inside {ZERO, sp, tp, ra, GP});
   }
 
   // These registers is only used inside PMP exception routine,
-  // so we can be a bit looser with constraints.
+  // so we can be a bit looser with constraints.     物理内存保护 寄存器   
   constraint reserve_pmp_reg_c {
     foreach (pmp_reg[i]) {
-      !(pmp_reg[i] inside {ZERO, sp, tp, scratch_reg});
+      !(pmp_reg[i] inside {ZERO, sp, tp, scratch_reg});   不能等于以下的值 
     }
-    unique {pmp_reg};
+      unique {pmp_reg};        //   要求所有的pmp_reg寄存器的取值必须是唯一的，不能重复。这是为了保证每个pmp_reg寄存器都具有独立的值和用途 
   }
 
   constraint gpr_c {
     foreach (gpr[i]) {
-      !(gpr[i] inside {sp, tp, scratch_reg, pmp_reg, ZERO, RA, GP});
+      !(gpr[i] inside {sp, tp, scratch_reg, pmp_reg, ZERO, RA, GP});    // gpr是通用寄存器（General Purpose Register）
     }
     unique {gpr};
   }
 
   constraint addr_translaction_rnd_order_c {
-    solve init_privileged_mode before virtual_addr_translation_on;
+    solve init_privileged_mode before virtual_addr_translation_on;    //  特权模式   虚拟地址转换
   }
 
   constraint addr_translaction_c {
     if ((init_privileged_mode != MACHINE_MODE) && (SATP_MODE != BARE)) {
-      virtual_addr_translation_on == 1'b1;
-    } else {
+      virtual_addr_translation_on == 1'b1;      // 虚拟地址 与 特权模式 及 SATP模式 的关系
+    } else {       //  MACHINE_MODE是一种特权模式，具有最高的权限和访问能力。而BARE是一种SATP模式，表示不启用虚拟地址翻译，直接使用物理地址进行内存访问。
       virtual_addr_translation_on == 1'b0;
     }
   }
 
   constraint floating_point_c {
     if (enable_floating_point) {
-      mstatus_fs == 2'b01;
+      mstatus_fs == 2'b01;     // 浮点模式启动
     } else {
-      mstatus_fs == 2'b00;
+      mstatus_fs == 2'b00;    // 浮点模式禁用
     }
   }
 
   constraint mstatus_vs_c {
     if (enable_vector_extension) {
-      mstatus_vs == 2'b01;
+      mstatus_vs == 2'b01;    // 启动向量拓展
     } else {
-      mstatus_vs == 2'b00;
+      mstatus_vs == 2'b00;    // 禁用向量拓展
     }
   }
 
@@ -519,7 +520,7 @@ class riscv_instr_gen_config extends uvm_object;
     `uvm_field_int(debug_program_instr_cnt, UVM_DEFAULT)
     `uvm_field_enum(data_pattern_t, data_page_pattern, UVM_DEFAULT)
     `uvm_field_enum(privileged_mode_t, init_privileged_mode, UVM_DEFAULT)
-    `uvm_field_array_enum(riscv_reg_t, reserved_regs, UVM_DEFAULT)
+    `uvm_field_array_enum(riscv_reg_t, , UVM_DEFAULT)
     `uvm_field_enum(riscv_reg_t, ra, UVM_DEFAULT)
     `uvm_field_enum(riscv_reg_t, sp, UVM_DEFAULT)
     `uvm_field_enum(riscv_reg_t, tp, UVM_DEFAULT)
@@ -575,7 +576,7 @@ class riscv_instr_gen_config extends uvm_object;
     `uvm_field_int(enable_vector_extension, UVM_DEFAULT)
     `uvm_field_int(vector_instr_only, UVM_DEFAULT)
     `uvm_field_int(enable_b_extension, UVM_DEFAULT)
-    `uvm_field_array_enum(b_ext_group_t, enable_bitmanip_groups, UVM_DEFAULT)
+    `uvm_field_array_enum(b_ext_group_t, , UVM_DEFAULT)
     `uvm_field_int(enable_zba_extension, UVM_DEFAULT)
     `uvm_field_int(enable_zbb_extension, UVM_DEFAULT)
     `uvm_field_int(enable_zbc_extension, UVM_DEFAULT)
@@ -587,72 +588,72 @@ class riscv_instr_gen_config extends uvm_object;
     string s;
     riscv_instr_group_t march_isa[];
     super.new(name);
-    init_delegation();
-    inst = uvm_cmdline_processor::get_inst();
-    get_int_arg_value("+num_of_tests=", num_of_tests);
-    get_int_arg_value("+enable_page_table_exception=", enable_page_table_exception);
-    get_bool_arg_value("+enable_interrupt=", enable_interrupt);
-    get_bool_arg_value("+enable_nested_interrupt=", enable_nested_interrupt);
-    get_bool_arg_value("+enable_timer_irq=", enable_timer_irq);
-    get_int_arg_value("+num_of_sub_program=", num_of_sub_program);
-    get_int_arg_value("+instr_cnt=", instr_cnt);
-    get_bool_arg_value("+no_ebreak=", no_ebreak);
-    get_bool_arg_value("+no_ecall=", no_ecall);
-    get_bool_arg_value("+no_dret=", no_dret);
-    get_bool_arg_value("+no_wfi=", no_wfi);
-    get_bool_arg_value("+no_branch_jump=", no_branch_jump);
-    get_bool_arg_value("+no_load_store=", no_load_store);
-    get_bool_arg_value("+no_csr_instr=", no_csr_instr);
-    get_bool_arg_value("+fix_sp=", fix_sp);
-    get_bool_arg_value("+use_push_data_section=", use_push_data_section);
-    get_bool_arg_value("+enable_illegal_csr_instruction=", enable_illegal_csr_instruction);
-    get_bool_arg_value("+enable_access_invalid_csr_level=", enable_access_invalid_csr_level);
-    get_bool_arg_value("+enable_misaligned_instr=", enable_misaligned_instr);
-    get_bool_arg_value("+enable_dummy_csr_write=", enable_dummy_csr_write);
-    get_bool_arg_value("+allow_sfence_exception=", allow_sfence_exception);
-    get_bool_arg_value("+no_data_page=", no_data_page);
-    get_bool_arg_value("+no_directed_instr=", no_directed_instr);
-    get_bool_arg_value("+no_fence=", no_fence);
-    get_bool_arg_value("+no_delegation=", no_delegation);
-    get_int_arg_value("+illegal_instr_ratio=", illegal_instr_ratio);
-    get_int_arg_value("+hint_instr_ratio=", hint_instr_ratio);
-    get_bool_arg_value("+gen_all_csrs_by_default=", gen_all_csrs_by_default);
-    get_bool_arg_value("+gen_csr_ro_write=", gen_csr_ro_write);
-    cmdline_enum_processor #(privileged_reg_t)::get_array_values("+add_csr_write=",
+    init_delegation();   // 异常/中断委派初始化
+    inst = uvm_cmdline_processor::get_inst();                                                 // UVM的一个类 用来处理命令行参数
+    get_int_arg_value("+num_of_tests=", num_of_tests);                                        // test 的数量   
+    get_int_arg_value("+enable_page_table_exception=", enable_page_table_exception);          // 用于控制是否启用页表异常,用于处理内存访问时的页表错误
+    get_bool_arg_value("+enable_interrupt=", enable_interrupt);                               // 中断
+    get_bool_arg_value("+enable_nested_interrupt=", enable_nested_interrupt);                 // 嵌套中断
+    get_bool_arg_value("+enable_timer_irq=", enable_timer_irq);                               // 定时器中断
+    get_int_arg_value("+num_of_sub_program=", num_of_sub_program);                            // 子程序数量
+    get_int_arg_value("+instr_cnt=", instr_cnt);                                              // 总的指令数量
+    get_bool_arg_value("+no_ebreak=", no_ebreak);                                             // 异常的处理机制
+    get_bool_arg_value("+no_ecall=", no_ecall);                                               // 处理器的系统调用机制
+    get_bool_arg_value("+no_dret=", no_dret);                                                 // dret指令用于从调试异常中返回。
+    get_bool_arg_value("+no_wfi=", no_wfi);                                                   // 等待中断 wait for interrupt
+    get_bool_arg_value("+no_branch_jump=", no_branch_jump);                                   // 没有跳转
+    get_bool_arg_value("+no_load_store=", no_load_store);                                     // 禁用 load / store
+    get_bool_arg_value("+no_csr_instr=", no_csr_instr);                                       // 是否禁用CSR（控制和状态寄存器）指令
+    get_bool_arg_value("+fix_sp=", fix_sp);                                                   // 固定栈指针
+    get_bool_arg_value("+use_push_data_section=", use_push_data_section);                     // 用于控制是否使用push/pop段来生成数据页
+    get_bool_arg_value("+enable_illegal_csr_instruction=", enable_illegal_csr_instruction);   // 生成错误的CSR指令
+    get_bool_arg_value("+enable_access_invalid_csr_level=", enable_access_invalid_csr_level); // 是否允许访问非法的CSR指令
+    get_bool_arg_value("+enable_misaligned_instr=", enable_misaligned_instr);                 // 控制是否允许在无效的特权级别下访问CSR
+    get_bool_arg_value("+enable_dummy_csr_write=", enable_dummy_csr_write);                   // 开始时是否对一些主要的系统CSR（xSTATUS/xIE）进行一些虚拟的写入操作
+    get_bool_arg_value("+allow_sfence_exception=", allow_sfence_exception);                   // 是否允许sfence指令产生异常
+    get_bool_arg_value("+no_data_page=", no_data_page);                                       // 没有数据页
+    get_bool_arg_value("+no_directed_instr=", no_directed_instr);                             // 用于控制是否禁用定向指令
+    get_bool_arg_value("+no_fence=", no_fence);                                               // 没有fence指令
+    get_bool_arg_value("+no_delegation=", no_delegation);                                     // 禁用中断/异常委派
+    get_int_arg_value("+illegal_instr_ratio=", illegal_instr_ratio);                          // 非法指令的概率
+    get_int_arg_value("+hint_instr_ratio=", hint_instr_ratio);                                // 提示指令的概率
+    get_bool_arg_value("+gen_all_csrs_by_default=", gen_all_csrs_by_default);                 // 默认生成使用所有支持的CSR的CSR指令
+    get_bool_arg_value("+gen_csr_ro_write=", gen_csr_ro_write);                               // 生成对只读CSR的写操作
+    cmdline_enum_processor #(privileged_reg_t)::get_array_values("+add_csr_write=",           // 可处理枚举类型的参数，是一个队列，用于添加可写CSR。通过向这个队列中添加CSR，可以生成对这些CSR的写操作
                                                               1'b1, add_csr_write);
-    cmdline_enum_processor #(privileged_reg_t)::get_array_values("+remove_csr_write=",
+    cmdline_enum_processor #(privileged_reg_t)::get_array_values("+remove_csr_write=",        // 从可写CSR中移除CSR。通过向这个队列中添加CSR，可以禁止生成对这些CSR的写操作
                                                               1'b1, remove_csr_write);
-    get_int_arg_value("+num_of_harts=", num_of_harts);
-    get_bool_arg_value("+enable_unaligned_load_store=", enable_unaligned_load_store);
-    get_bool_arg_value("+force_m_delegation=", force_m_delegation);
-    get_bool_arg_value("+force_s_delegation=", force_s_delegation);
-    get_bool_arg_value("+require_signature_addr=", require_signature_addr);
-    get_bool_arg_value("+disable_compressed_instr=", disable_compressed_instr);
-    get_bool_arg_value("+randomize_csr=", randomize_csr);
+    get_int_arg_value("+num_of_harts=", num_of_harts);                                        // 在模拟中运行的RISC-V硬件线程（hart）的数量
+    get_bool_arg_value("+enable_unaligned_load_store=", enable_unaligned_load_store);         // 控制是否启用非对齐的加载/存储操作
+    get_bool_arg_value("+force_m_delegation=", force_m_delegation);                           // 如果出现异常就委派给 机器模式解决
+    get_bool_arg_value("+force_s_delegation=", force_s_delegation);                           // 如果出现异常就委派给 Supervisor模式解决
+    get_bool_arg_value("+require_signature_addr=", require_signature_addr);                   // 被用作一个特殊的标记，当程序向这个地址写入数据时，会触发一些事件或
+    get_bool_arg_value("+disable_compressed_instr=", disable_compressed_instr);               // 控制是否禁用压缩指令
+    get_bool_arg_value("+randomize_csr=", randomize_csr);                                     // 是否对一些主要的系统CSR（xSTATUS/xIE）进行一些虚拟的写入操作
     if (this.require_signature_addr) begin
-      get_hex_arg_value("+signature_addr=", signature_addr);
+      get_hex_arg_value("+signature_addr=", signature_addr);                                  // 如果有 被用作一个特殊的标记，当程序向这个地址写入数据时，会触发一些事件或，需要添加一个地址
     end
-    if ($value$plusargs("tvec_alignment=%0d", tvec_alignment)) begin
+    if ($value$plusargs("tvec_alignment=%0d", tvec_alignment)) begin                          // tvec_alignment表示中断向量表的对齐要求 ， 并且把随机模式关掉
       tvec_alignment.rand_mode(0);
     end
-    get_bool_arg_value("+gen_debug_section=", gen_debug_section);
-    get_bool_arg_value("+bare_program_mode=", bare_program_mode);
-    get_int_arg_value("+num_debug_sub_program=", num_debug_sub_program);
-    get_bool_arg_value("+enable_ebreak_in_debug_rom=", enable_ebreak_in_debug_rom);
-    get_bool_arg_value("+set_dcsr_ebreak=", set_dcsr_ebreak);
-    get_bool_arg_value("+enable_debug_single_step=", enable_debug_single_step);
-    get_bool_arg_value("+set_mstatus_tw=", set_mstatus_tw);
-    get_bool_arg_value("+set_mstatus_mprv=", set_mstatus_mprv);
-    get_bool_arg_value("+enable_floating_point=", enable_floating_point);
-    get_bool_arg_value("+enable_vector_extension=", enable_vector_extension);
-    get_bool_arg_value("+enable_b_extension=", enable_b_extension);
+    get_bool_arg_value("+gen_debug_section=", gen_debug_section);                             // 用于控制是否生成一个完整的或空的debug_rom段。
+    get_bool_arg_value("+bare_program_mode=", bare_program_mode);                             // 用于控制是否生成一个裸程序，这个程序中只包含了最基本的指令和数据，
+    get_int_arg_value("+num_debug_sub_program=", num_debug_sub_program);                      // debug下的子程序的数量，默认0
+    get_bool_arg_value("+enable_ebreak_in_debug_rom=", enable_ebreak_in_debug_rom);           // 当程序执行到这个指令时，会跳转到异常处理程序并执行相应的操作。
+    get_bool_arg_value("+set_dcsr_ebreak=", set_dcsr_ebreak);                                 // 用于控制是否设置dcsr寄存器的ebreak位。中断异常位
+    get_bool_arg_value("+enable_debug_single_step=", enable_debug_single_step);               // 单步调试的时候每一个步里面的指令数量
+    get_bool_arg_value("+set_mstatus_tw=", set_mstatus_tw);                                   // WFI（wait for interrupt 等着什么都不干）指令会触发一个非法指令异常 或者正常运行
+    get_bool_arg_value("+set_mstatus_mprv=", set_mstatus_mprv);                               // 控制是否启用内存访问的权限
+    get_bool_arg_value("+enable_floating_point=", enable_floating_point);                     // 浮点模式启动
+    get_bool_arg_value("+enable_vector_extension=", enable_vector_extension);                 // 向量拓展
+    get_bool_arg_value("+enable_b_extension=", enable_b_extension);                           // 控制是否支持位拓展
     get_bool_arg_value("+enable_zba_extension=", enable_zba_extension);
     get_bool_arg_value("+enable_zbb_extension=", enable_zbb_extension);
     get_bool_arg_value("+enable_zbc_extension=", enable_zbc_extension);
     get_bool_arg_value("+enable_zbs_extension=", enable_zbs_extension);
-    cmdline_enum_processor #(b_ext_group_t)::get_array_values("+enable_bitmanip_groups=",
+    cmdline_enum_processor #(b_ext_group_t)::get_array_values("+enable_bitmanip_groups=",     // 位块复制 等操作
                                                               1'b0, enable_bitmanip_groups);
-    if(inst.get_arg_value("+boot_mode=", boot_mode_opts)) begin
+    if(inst.get_arg_value("+boot_mode=", boot_mode_opts)) begin                               // 可以指定在启动时使用哪种特权模式。
       `uvm_info(get_full_name(), $sformatf(
                 "Got boot mode option - %0s", boot_mode_opts), UVM_LOW)
       case(boot_mode_opts)
@@ -667,39 +668,39 @@ class riscv_instr_gen_config extends uvm_object;
     end
     `uvm_info(`gfn, $sformatf("riscv_instr_pkg::supported_privileged_mode = %0d",
                    riscv_instr_pkg::supported_privileged_mode.size()), UVM_LOW)
-    void'(inst.get_arg_value("+asm_test_suffix=", asm_test_suffix));
-    // Directed march list from the runtime options, ex. RV32I, RV32M etc.
+        void'(inst.get_arg_value("+asm_test_suffix=", asm_test_suffix));                         // 用于为生成的汇编程序指定一个后缀名
+    // Directed march list from the runtime options, ex. RV32I, RV32M etc.                       // 选择不同的指令集
     cmdline_enum_processor #(riscv_instr_group_t)::get_array_values("+march=", 1'b0, march_isa);
     if (march_isa.size != 0) riscv_instr_pkg::supported_isa = march_isa;
 
     if (!(RV32C inside {supported_isa})) begin
-      disable_compressed_instr = 1;
+      disable_compressed_instr = 1;   // 禁用压缩
     end
 
     if (!((RV32ZBA inside {supported_isa}) ||
           (RV64ZBA inside {supported_isa}))) begin
-      enable_zba_extension = 0;
+      enable_zba_extension = 0;      // 位拓展相关
     end
 
     if (!((RV32ZBB inside {supported_isa}) ||
           (RV64ZBB inside {supported_isa}))) begin
-      enable_zbb_extension = 0;
+      enable_zbb_extension = 0;       // 位拓展相关
     end
 
     if (!((RV32ZBC inside {supported_isa}) ||
           (RV64ZBC inside {supported_isa}))) begin
-      enable_zbc_extension = 0;
+      enable_zbc_extension = 0;      // 位拓展相关
     end
 
     if (!((RV32ZBS inside {supported_isa}) ||
           (RV64ZBS inside {supported_isa}))) begin
-      enable_zbs_extension = 0;
+      enable_zbs_extension = 0;       // 位拓展相关
     end
 
-    vector_cfg = riscv_vector_cfg::type_id::create("vector_cfg");
-    pmp_cfg = riscv_pmp_cfg::type_id::create("pmp_cfg");
-    pmp_cfg.rand_mode(pmp_cfg.pmp_randomize);
-    pmp_cfg.initialize(signature_addr);
+        vector_cfg = riscv_vector_cfg::type_id::create("vector_cfg");                      // 向量拓展
+        pmp_cfg = riscv_pmp_cfg::type_id::create("pmp_cfg");                               // 物理内存保护
+    pmp_cfg.rand_mode(pmp_cfg.pmp_randomize);                                          
+        pmp_cfg.initialize(signature_addr);                                                // 被用作一个特殊的标记，当程序向这个地址写入数据时，会触发一些事件或，需要添加一个地址
     setup_instr_distribution();
     get_invalid_priv_lvl_csr();
   endfunction
@@ -728,7 +729,7 @@ class riscv_instr_gen_config extends uvm_object;
   endfunction
 
   // Initialize the exception/interrupt delegation associate array, set all delegation default to 0
-  virtual function void init_delegation();
+        virtual function void init_delegation();   // 异常/中断委派初始化
     exception_cause_t cause;
     interrupt_cause_t intr_cause;
     cause = cause.first;
@@ -761,11 +762,11 @@ class riscv_instr_gen_config extends uvm_object;
 
   function void post_randomize();
     // Setup the list all reserved registers
-    reserved_regs = {tp, sp, scratch_reg};
+    reserved_regs = {tp, sp, scratch_reg};     // 特殊的寄存器，值需要预加载
     // Need to save all loop registers, and RA/T0
-    min_stack_len_per_program = 2 * (XLEN/8);
+    min_stack_len_per_program = 2 * (XLEN/8);   // 分配字节的栈空间
     // Check if the setting is legal
-    check_setting();
+    check_setting();                       // 检查设置是否合理
   endfunction
 
   virtual function void check_setting();
@@ -796,8 +797,8 @@ class riscv_instr_gen_config extends uvm_object;
   // Populate invalid_priv_mode_csrs with the main implemented CSRs for each supported privilege
   // mode
   // TODO(udi) - include performance/pmp/trigger CSRs?
-  virtual function void get_invalid_priv_lvl_csr();
-    string invalid_lvl[$];
+        virtual function void get_invalid_priv_lvl_csr();    // 不同的特权级别有不同的CSR，因此需要在相应的特权级别下访问它们.
+          string invalid_lvl[$];                             // 将该CSR添加到invalid_priv_mode_csrs数组中，表示该CSR的特权级别无效。
     string csr_name;
     privileged_reg_t csr;
     // Debug CSRs are inaccessible from all but Debug Mode, and we cannot boot into Debug Mode
