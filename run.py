@@ -357,7 +357,7 @@ def do_simulate(sim_cmd, simulator, test_list, cwd, sim_opts, seed_gen,    # 运
                          debug_cmd=debug_cmd)
 
 
-def gen(test_list, argv, output_dir, cwd):    #  运行指令发生器 todo： 和上面的有什么区别
+def gen(test_list, argv, output_dir, cwd):    #  运行指令发生器 todo： 和上面的有什么区别 区别：gen 包含了do_com and do_sim 
     """Run the instruction generator
 
     Args:
