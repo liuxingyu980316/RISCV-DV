@@ -359,7 +359,7 @@ class riscv_instr_gen_config extends uvm_object;
   // Keep the number of single step iterations relatively small
   constraint debug_single_step_c {
     if (enable_debug_single_step) {
-      single_step_iterations inside {[10 : 50]};
+      single_step_iterations inside {[10 : 50]};  // 单步调试的时候每一个步里面的指令数量
     }
   }
 
