@@ -223,7 +223,7 @@ def do_compile(compile_cmd, test_list, core_setting_dir, cwd, ext_dir,    # 编�
                 run_parallel_cmd([cmd], debug_cmd=debug_cmd)  # 多个同时跑
             else:
                 logging.debug("Compile command: {}".format(cmd))
-                run_cmd(cmd, debug_cmd=debug_cmd)           # 运行随机指令生成器
+                run_cmd(cmd, debug_cmd=debug_cmd)           # 运行随机指令生成器的 com
 
 
 def run_csr_test(cmd_list, cwd, csr_file, isa, iterations, lsf_cmd,       # control and status reg  测试
