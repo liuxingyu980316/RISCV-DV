@@ -17,10 +17,11 @@
 
 //-----------------------------------------------------------------------------------------
 // RISC-V assembly program generator
-//
+//   RISC-V汇编程序生成器
 // This is the main class to generate a complete RISC-V program, including the init routine,
 // instruction section, data section, stack section, page table, interrupt and exception
 // handling etc. Check gen_program() function to see how the program is generated.
+//  查看gen_program()函数以了解程序是如何生成的。
 //-----------------------------------------------------------------------------------------
 
 class riscv_asm_program_gen extends uvm_object;
@@ -38,6 +39,7 @@ class riscv_asm_program_gen extends uvm_object;
    // umode_program is designed for this purpose. There can be other cases that
    // instruction can only be fetched from S-mode pages but load/store can access U-mode pages, or
    // everything needs to be in S-mode pages.
+   
    riscv_instr_sequence                umode_program;
    riscv_instr_sequence                smode_program;
    riscv_instr_sequence                smode_lsu_program;
