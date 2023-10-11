@@ -31,6 +31,18 @@
 // - Post-process the load/store/branch instructions.
 // - Insert the jump instructions to its sub-programs (done by riscv_asm_program_gen).
 // - Generate a return instruction at the end of the program.
+// 这个类用于为RISC-V汇编程序生成单个指令序列。它由riscv_asm_program_gen用于生成主程序和所有子程序。流程如下：
+// 对于主程序：
+// - 生成指令序列主体。
+// - 对加载/存储/分支指令进行后处理。
+// - 插入跳转到其子程序的指令（由riscv_asm_program_gen完成）。
+// 对于子程序：
+// - 生成进入此程序时执行的栈推送指令。
+// - 生成指令序列主体。
+// - 生成退出此程序之前执行的栈弹出指令。
+// - 对加载/存储/分支指令进行后处理。
+// - 插入跳转到其子程序的指令（由riscv_asm_program_gen完成）。
+// - 在程序末尾生成返回指令。
 //-----------------------------------------------------------------------------------------
 
 class riscv_instr_sequence extends uvm_sequence;
