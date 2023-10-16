@@ -16,63 +16,63 @@
 
 class riscv_instr extends uvm_object;
 
-  // All derived instructions
-  static bit                 instr_registry[riscv_instr_name_t];
+  // All derived instructions    派生的指令
+  static bit                 instr_registry[riscv_instr_name_t];           // 记录所有已注册的指令名称
 
   // Instruction list
-  static riscv_instr_name_t  instr_names[$];
+  static riscv_instr_name_t  instr_names[$];                               // 存储所有指令的名称
 
   // Categorized instruction list
-  static riscv_instr_name_t  instr_group[riscv_instr_group_t][$];
-  static riscv_instr_name_t  instr_category[riscv_instr_category_t][$];
-  static riscv_instr_name_t  basic_instr[$];
+  static riscv_instr_name_t  instr_group[riscv_instr_group_t][$];          // riscv_instr_group_t表示指令组的类型 通常用于区分不同类型的指令，比如算术指令、逻辑指令
+  static riscv_instr_name_t  instr_category[riscv_instr_category_t][$];    //  是对指令更加细致的划分，通常在同一组内，指令可以按照不同的类别进行进一步分类，比如移位指令、比较指令等
+  static riscv_instr_name_t  basic_instr[$];                               //  基本指令的列表
   static riscv_instr         instr_template[riscv_instr_name_t];
 
 
-  riscv_instr_gen_config     m_cfg;
+  riscv_instr_gen_config     m_cfg;       //   配置
 
   // Instruction attributes
-  riscv_instr_group_t        group;
-  riscv_instr_format_t       format;
-  riscv_instr_category_t     category;
-  riscv_instr_name_t         instr_name;
-  imm_t                      imm_type;
-  bit [4:0]                  imm_len;
+  riscv_instr_group_t        group;      //   指令的分组或类别
+  riscv_instr_format_t       format;     //  指令的格式或结构
+  riscv_instr_category_t     category;   //  指令的更大范围的分类
+  riscv_instr_name_t         instr_name;  //  指令的名字
+  imm_t                      imm_type;    //  指令的立即数
+  bit [4:0]                  imm_len;     //  立即数的长度
 
   // Operands
-  rand bit [11:0]            csr;
-  rand riscv_reg_t           rs2;
-  rand riscv_reg_t           rs1;
-  rand riscv_reg_t           rd;
-  rand bit [31:0]            imm;
+  rand bit [11:0]            csr;   //  控制状态寄存器（Control Status Register）的地址
+  rand riscv_reg_t           rs2;   //  RISC-V指令的第二个源操作数寄存器
+  rand riscv_reg_t           rs1;   //  RISC-V指令的第一个源操作数寄存器
+  rand riscv_reg_t           rd;    //  RISC-V指令的目的操作数寄存器
+  rand bit [31:0]            imm;   //  RISC-V指令的立即数
 
   // Helper fields
-  bit [31:0]                 imm_mask = 32'hFFFF_FFFF;
-  bit                        is_branch_target;
-  bit                        has_label = 1'b1;
-  bit                        atomic = 0;
-  bit                        branch_assigned;
-  bit                        process_load_store = 1'b1;
-  bit                        is_compressed;
-  bit                        is_illegal_instr;
-  bit                        is_hint_instr;
-  bit                        is_floating_point;
-  string                     imm_str;
-  string                     comment;
-  string                     label;
-  bit                        is_local_numeric_label;
-  int                        idx = -1;
-  bit                        has_rs1 = 1'b1;
-  bit                        has_rs2 = 1'b1;
-  bit                        has_rd = 1'b1;
-  bit                        has_imm = 1'b1;
+  bit [31:0]                 imm_mask = 32'hFFFF_FFFF;    //  立即数的掩码
+  bit                        is_branch_target;            //  表示当前指令是否是分支
+  bit                        has_label = 1'b1;            //  表示指令是否有标签
+  bit                        atomic = 0;                  //  是否是原子操作
+  bit                        branch_assigned;             //  表示分支是否已分配
+  bit                        process_load_store = 1'b1;   //  是否加载和存储指令
+  bit                        is_compressed;               //  是否是压缩格式
+  bit                        is_illegal_instr;            //  指令是否是非法指令
+  bit                        is_hint_instr;               //  是否是提示指令
+  bit                        is_floating_point;           //  是否是浮点指令
+  string                     imm_str;                     //  用于存储立即数的字符串表示
+  string                     comment;                     //  指令的注释
+  string                     label;                       //  存储指令的标签
+  bit                        is_local_numeric_label;      //  标签是否是本地数字标签
+  int                        idx = -1;                    //  指令的索引或位置
+  bit                        has_rs1 = 1'b1;              //  指令是否有第一个源操作数寄存器（rs1）
+  bit                        has_rs2 = 1'b1;              //  指令是否有第二个源操作数寄存器（rs2）
+  bit                        has_rd = 1'b1;               //  指令是否有目的操作数寄存器（rd）
+  bit                        has_imm = 1'b1;              //  指令是否有立即数
 
   constraint imm_c {
     if (instr_name inside {SLLIW, SRLIW, SRAIW}) {
       imm[11:5] == 0;
     }
     if (instr_name inside {SLLI, SRLI, SRAI}) {
-      if (XLEN == 32) {
+      if (XLEN == 32) {       // 寄存器数量
         imm[11:5] == 0;
       } else {
         imm[11:6] == 0;
@@ -84,54 +84,54 @@ class riscv_instr extends uvm_object;
   `uvm_object_utils(riscv_instr)
   `uvm_object_new
 
-  static function bit register(riscv_instr_name_t instr_name);
+  static function bit register(riscv_instr_name_t instr_name);  // 把instr_name 在instr_registry中登记起来
     `uvm_info("riscv_instr", $sformatf("Registering %0s", instr_name.name()), UVM_LOW)
     instr_registry[instr_name] = 1;
     return 1;
   endfunction : register
 
-  // Create the list of instructions based on the supported ISA extensions and configuration of the
+  // Create the list of instructions based on the supported ISA extensions and configuration of the  根据支持的ISA扩展和生成器的配置创建指令列表
   // generator.
   static function void create_instr_list(riscv_instr_gen_config cfg);
     instr_names.delete();
     instr_group.delete();
     instr_category.delete();
-    foreach (instr_registry[instr_name]) begin
+    foreach (instr_registry[instr_name]) begin      // 先使用上面的那个函数登记起来，登记为1的才会进入循环
       riscv_instr instr_inst;
       if (instr_name inside {unsupported_instr}) continue;
-      instr_inst = create_instr(instr_name);
-      instr_template[instr_name] = instr_inst;
-      if (!instr_inst.is_supported(cfg)) continue;
+      instr_inst = create_instr(instr_name);      //  创建一个riscv_instr 类型的对象，创建名为 instr_name 的指令对象
+      instr_template[instr_name] = instr_inst;    //  代码将 instr_inst 添加到 instr_template 数组中，以 instr_name 作为键。instr_template 数组就存储了创建的指令对象，以便后续使用
+      if (!instr_inst.is_supported(cfg)) continue; //  利用cfg 判断这个instr是否被支持, 这个函数永远return 1
       // C_JAL is RV32C only instruction
-      if ((XLEN != 32) && (instr_name == C_JAL)) continue;
-      if ((SP inside {cfg.reserved_regs}) && (instr_name inside {C_ADDI16SP})) begin
+      if ((XLEN != 32) && (instr_name == C_JAL)) continue;   //  出现了这种情况就continue  C_JAL 指令是 RV32C 的专有指令
+      if ((SP inside {cfg.reserved_regs}) && (instr_name inside {C_ADDI16SP})) begin   //  因为 C_ADDI16SP 指令使用了 SP 寄存器，如果 SP 寄存器被保留，就需要跳过该指令。
         continue;
       end
-      if (!cfg.enable_sfence && instr_name == SFENCE_VMA) continue;
-      if (cfg.no_fence && (instr_name inside {FENCE, FENCE_I, SFENCE_VMA})) continue;
-      if ((instr_inst.group inside {supported_isa}) &&
-          !(cfg.disable_compressed_instr &&
+      if (!cfg.enable_sfence && instr_name == SFENCE_VMA) continue;     //   sfence 指令的跳过
+      if (cfg.no_fence && (instr_name inside {FENCE, FENCE_I, SFENCE_VMA})) continue;   //  fence 指令的跳过
+      if ((instr_inst.group inside {supported_isa}) &&     // 成功的指令： 在指令列表里
+          !(cfg.disable_compressed_instr &&                // 跳过的指令：非压缩但 RV32C, RV64C, RV32DC, RV32FC, RV128C
             (instr_inst.group inside {RV32C, RV64C, RV32DC, RV32FC, RV128C})) &&
-          !(!cfg.enable_floating_point &&
+          !(!cfg.enable_floating_point &&         // 跳过的指令： 非浮点，但 RV32F, RV64F, RV32D, RV64D
             (instr_inst.group inside {RV32F, RV64F, RV32D, RV64D})) &&
-          !(!cfg.enable_vector_extension &&
+          !(!cfg.enable_vector_extension &&     // 跳过的指令： 非向量拓展 但 RVV指令
             (instr_inst.group inside {RVV})) &&
-          !(cfg.vector_instr_only &&
+          !(cfg.vector_instr_only &&            // 跳过的指令： 仅向量拓展 但 不是RVV指令
             !(instr_inst.group inside {RVV}))
-          ) begin
-        instr_category[instr_inst.category].push_back(instr_name);
-        instr_group[instr_inst.group].push_back(instr_name);
-        instr_names.push_back(instr_name);
-      end
+         ) begin                                                       //  instr_inst 其实就是 instr_name 的拓展
+        instr_category[instr_inst.category].push_back(instr_name);    // 添加到 instr_category 数据结构中，该结构以 instr_inst.category 作为键
+        instr_group[instr_inst.group].push_back(instr_name);    //  将 instr_name 添加到 instr_group 数据结构中，该结构以 instr_inst.group 作为键
+        instr_names.push_back(instr_name);                       //   instr_name 添加到一个名为 instr_names 的列表中
+      end 
     end
-    build_basic_instruction_list(cfg);
+    build_basic_instruction_list(cfg);    //  形成 basic_指令的类别列表
   endfunction : create_instr_list
 
   virtual function bit is_supported(riscv_instr_gen_config cfg);
     return 1;
   endfunction
 
-  static function riscv_instr create_instr(riscv_instr_name_t instr_name);
+      static function riscv_instr create_instr(riscv_instr_name_t instr_name);   //  创建一个riscv_instr 类型的对象，创建名为 instr_name 的指令对象  instr_inst 其实就是 instr_name 的拓展
     uvm_object obj;
     riscv_instr inst;
     string instr_class_name;
@@ -148,33 +148,34 @@ class riscv_instr extends uvm_object;
     return inst;
   endfunction : create_instr
 
-  static function void build_basic_instruction_list(riscv_instr_gen_config cfg);
-    basic_instr = {instr_category[SHIFT], instr_category[ARITHMETIC],
+      static function void build_basic_instruction_list(riscv_instr_gen_config cfg);  //  形成 basic_指令的类别列表
+    basic_instr = {instr_category[SHIFT], instr_category[ARITHMETIC],    // 移位运算指令 算术运算指令  逻辑运算指令  比较指令
                    instr_category[LOGICAL], instr_category[COMPARE]};
+    //  根据 cfg的指令，把指令添加到上述的列表中
     if (!cfg.no_ebreak) begin
-      basic_instr = {basic_instr, EBREAK};
+      basic_instr = {basic_instr, EBREAK};       //  在basic_instr后面新增 EBREAK
       foreach (riscv_instr_pkg::supported_isa[i]) begin
         if (RV32C inside {riscv_instr_pkg::supported_isa[i]} &&
             !cfg.disable_compressed_instr) begin
-          basic_instr = {basic_instr, C_EBREAK};
+          basic_instr = {basic_instr, C_EBREAK};   //  在basic_instr后面新增 C_EBREAK
           break;
         end
       end
     end
     if (!cfg.no_ecall) begin
-      basic_instr = {basic_instr, ECALL};
+      basic_instr = {basic_instr, ECALL};     //  将 ECALL 指令添加到 basic_instr 列表中。
     end
     if (cfg.no_dret == 0) begin
-      basic_instr = {basic_instr, DRET};
+      basic_instr = {basic_instr, DRET};      //  将 DRET 指令添加到 basic_instr 列表中。
     end
     if (cfg.no_fence == 0) begin
-      basic_instr = {basic_instr, instr_category[SYNCH]};
+      basic_instr = {basic_instr, instr_category[SYNCH]};   //  将 SYNCH类的 指令添加到 basic_instr 列表中。
     end
-    if ((cfg.no_csr_instr == 0) && (cfg.init_privileged_mode == MACHINE_MODE)) begin
+    if ((cfg.no_csr_instr == 0) && (cfg.init_privileged_mode == MACHINE_MODE)) begin  //  特权模式为机器模式且有csr_instr   将 CSR 类别的指令添加到 basic_instr
       basic_instr = {basic_instr, instr_category[CSR]};
     end
     if (cfg.no_wfi == 0) begin
-      basic_instr = {basic_instr, WFI};
+      basic_instr = {basic_instr, WFI};     //   将 WFI 指令添加到 basic_instr 列表中。
     end
   endfunction : build_basic_instruction_list
 
