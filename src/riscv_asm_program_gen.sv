@@ -21,6 +21,7 @@
 // This is the main class to generate a complete RISC-V program, including the init routine,
 // instruction section, data section, stack section, page table, interrupt and exception
 // handling etc. Check gen_program() function to see how the program is generated.
+// 初始化例程、指令段、数据段、堆栈段、页表、中断和异常处理
 //  查看gen_program()函数以了解程序是如何生成的。
 //-----------------------------------------------------------------------------------------
 
@@ -39,6 +40,7 @@ class riscv_asm_program_gen extends uvm_object;
    // umode_program is designed for this purpose. There can be other cases that
    // instruction can only be fetched from S-mode pages but load/store can access U-mode pages, or
    // everything needs to be in S-mode pages.
+   // 以下的内核程序是用于在中断/异常处理过程中保护用户模式数据的安全，并根据不同的特权模式设置进行相应的操作。
    
    riscv_instr_sequence                umode_program;
    riscv_instr_sequence                smode_program;
@@ -48,6 +50,7 @@ class riscv_asm_program_gen extends uvm_object;
    riscv_callstack_gen                 callstack_gen;
    riscv_privileged_common_seq         privil_seq;
    // Directed instruction ratio, occurance per 1000 instructions
+   // 每1000条指令出现定向指令的比例
    int unsigned                        directed_instr_stream_ratio[string];
    riscv_page_table_list#(SATP_MODE)   page_table_list;
    int                                 hart;
@@ -60,115 +63,135 @@ class riscv_asm_program_gen extends uvm_object;
 
   //---------------------------------------------------------------------------------------
   // Main function to generate the whole program
+  // 生成指令的主函数
   //---------------------------------------------------------------------------------------
 
   // This is the main function to generate all sections of the program.
   virtual function void gen_program();
     // Prevent generation of PMP exception handling code where PMP is not supported
-    if (!support_pmp) begin
+     if (!support_pmp) begin   // 内存保护
       cfg.pmp_cfg.enable_pmp_exception_handler = 1'b0;
     end
 
-    instr_stream.delete();
+     instr_stream.delete();   // 删掉所有的指令保存的队列
     // Generate program header
-    gen_program_header();
-    for (int hart = 0; hart < cfg.num_of_harts; hart++) begin
+     gen_program_header();    // 这个函数的主要目的是生成程序的初始化部分，设置程序的基本结构和运行环境，同时为每个hart处理器核心生成对应的处理代码。
+     for (int hart = 0; hart < cfg.num_of_harts; hart++) begin // 处理器核心
       string sub_program_name[$];
-      instr_stream.push_back($sformatf("h%0d_start:", hart));
+        instr_stream.push_back($sformatf("h%0d_start:", hart));        // 当前 hart程序的名称和跳转位置   h1_start:
       if (!cfg.bare_program_mode) begin
-        setup_misa();
+         setup_misa();     // 用于设置处理器的ISA（指令集架构）相关寄存器，以支持特定的指令集和功能。
         // Create all page tables
-        create_page_table(hart);
+         create_page_table(hart);    //  用于创建当前hart的页表，实现虚拟地址到物理地址的映射。
         // Setup privileged mode registers and enter target privileged mode
-        pre_enter_privileged_mode(hart);
+         pre_enter_privileged_mode(hart);   // 用于设置进入特权模式前的寄存器值和其他必要的准备工作。
       end
       // Init section
       gen_init_section(hart);
-      // If PMP is supported, we want to generate the associated trap handlers and the test_done
-      // section at the start of the program so we can allow access through the pmpcfg0 CSR
-      if (riscv_instr_pkg::support_pmp && !cfg.bare_program_mode) begin
-        gen_trap_handlers(hart);
+      // If PMP is supported, we want to generate the associated trap handlers and the test_done // 如果PMP（物理内存保护）被支持，那么这段代码的目标是生成相关的陷阱处理程序和test_done部分，将它们放在程序的开始位置。这样做是为了允许通过pmpcfg0 CSR（控制和状态寄存器）进行访问。
+      // section at the start of the program so we can allow access through the pmpcfg0 CSR    // PMP是一种内存保护机制，它可以限制不同特权级别的代码对物理内存的访问权限。当PMP被启用时，如果某个程序试图访问它没有权限的内存区域，就会触发陷阱（trap）。
+        if (riscv_instr_pkg::support_pmp && !cfg.bare_program_mode) begin   // 支持物理内存保护，并且不仅仅只是一个裸程序
+           gen_trap_handlers(hart);   // 生成 trap的指针， 动态地查找和处理不同类型的陷阱事件
         // Ecall handler
-        gen_ecall_handler(hart);
+           gen_ecall_handler(hart);    // 生成了不同类型的陷阱处理程序。这些处理程序用于处理特定类型的陷阱事件，比如系统调用（ecall）
         // Instruction fault handler
-        gen_instr_fault_handler(hart);
+           gen_instr_fault_handler(hart);  // 同上指令错误、加载错误和存储错误等
         // Load fault handler
-        gen_load_fault_handler(hart);
+           gen_load_fault_handler(hart);   // 同上加载错误和存储错误等
         // Store fault handler
-        gen_store_fault_handler(hart);
+           gen_store_fault_handler(hart);   // 同上存储错误等
         if (hart == 0) begin
-          gen_test_done();
+           gen_test_done();     // 如果是主处理器（hart 0），则生成test_done处理程序。这个处理程序可能用于标识某个测试或初始化阶段的完成，以便程序可以进入正常的执行阶段
         end
       end
-      // Generate sub program
+      // Generate sub program   这段代码生成了一个子程序，通过创建一个指令序列来形成
+        // hart表示当前处理的处理器编号。
+        //  sub_program[hart]可能是一个数组或列表，包含了要生成的子程序的内容或指令。
+        // sub_program_name是子程序的名称。
+        // cfg.num_of_sub_program表示子程序的数量。
       gen_sub_program(hart, sub_program[hart], sub_program_name, cfg.num_of_sub_program);
-      // Generate main program
-      main_program[hart] = riscv_instr_sequence::type_id::create(get_label("main", hart));
-      main_program[hart].instr_cnt = cfg.main_program_instr_cnt;
-      main_program[hart].is_debug_program = 0;
-      main_program[hart].label_name = main_program[hart].get_name();
-      generate_directed_instr_stream(.hart(hart),
+        
+      // Generate main program   和上面的子程序生成类似，也是靠生成指令序列来完成
+        main_program[hart] = riscv_instr_sequence::type_id::create(get_label("main", hart));  // 创建主程序序列
+        main_program[hart].instr_cnt = cfg.main_program_instr_cnt; // 指令数
+        main_program[hart].is_debug_program = 0; // 是否为调试程序
+        main_program[hart].label_name = main_program[hart].get_name(); // 标签名称
+        generate_directed_instr_stream(.hart(hart),   // 将当前的配置对象cfg赋值给main_program[hart].cfg，以便在后续的指令生成过程中使用
                                      .label(main_program[hart].label_name),
                                      .original_instr_cnt(main_program[hart].instr_cnt),
                                      .min_insert_cnt(1),
                                      .instr_stream(main_program[hart].directed_instr));
-      main_program[hart].cfg = cfg;
-      `DV_CHECK_RANDOMIZE_FATAL(main_program[hart])
-      main_program[hart].gen_instr(.is_main_program(1), .no_branch(cfg.no_branch_jump));
-      // Setup jump instruction among main program and sub programs
+        main_program[hart].cfg = cfg;  
+        `DV_CHECK_RANDOMIZE_FATAL(main_program[hart])  //  main_program[hart]进行随机化检查，以确保生成的指令序列符合期望的随机性要求
+        main_program[hart].gen_instr(.is_main_program(1), .no_branch(cfg.no_branch_jump));  // 生成指令 todo:更详细的去看看
+        
+      // Setup jump instruction among main program and sub programs     设置主程序和子程序之间的跳转指令，并对主程序进行后处理和生成指令流
       gen_callstack(main_program[hart], sub_program[hart], sub_program_name,
-                    cfg.num_of_sub_program);
+                    cfg.num_of_sub_program);     //  生成调用栈，这个函数的作用是在主程序和子程序之间设置跳转指令，以便在运行时能够实现正确的程序流程控制
       `uvm_info(`gfn, "Generating callstack...done", UVM_LOW)
-      main_program[hart].post_process_instr();
+
+
+        
+        main_program[hart].post_process_instr();    //  函数对主程序进行后处理，这个函数的作用是对生成的指令序列进行一些额外的处理或优化。
       `uvm_info(`gfn, "Post-processing main program...done", UVM_LOW)
-      main_program[hart].generate_instr_stream();
+        main_program[hart].generate_instr_stream();    // 这个函数的作用是生成全部的指令流
       `uvm_info(`gfn, "Generating main program instruction stream...done", UVM_LOW)
-      instr_stream = {instr_stream, main_program[hart].instr_string_list};
+        instr_stream = {instr_stream, main_program[hart].instr_string_list};   //  生成的指令流添加到总的指令流instr_stream队列中，以便在运行时执行
+
       // If PMP is supported, need to jump from end of main program to test_done section at the end
-      // of main_program, as the test_done will have moved to the beginning of the program
-      instr_stream = {instr_stream,
-                      $sformatf("%sla x%0d, test_done", indent, cfg.scratch_reg),
+      // of main_program, as the test_done will have moved to the beginning of the program   // 主程序的末尾添加了两条指令，用于在支持PMP（物理内存保护）的情况下，从主程序的末尾跳转到test_done部分
+        instr_stream = {instr_stream, 
+                        $sformatf("%sla x%0d, test_done", indent, cfg.scratch_reg),    //分别是加载地址指令la和间接跳转指令jalr。这两条指令的作用是将test_done的地址加载到指定的寄存器中，并跳转到该地址执行代码
                       $sformatf("%sjalr x0, x%0d, 0", indent, cfg.scratch_reg)
-                     };
-      // Test done section
+                       };   // 这段代码的目的是确保在支持PMP的情况下，程序能够正确地跳转到test_done部分执行后续的测试或初始化操作，保证程序的正确性和完整性
+      // Test done section   
       // If PMP isn't supported, generate this in the normal location
       if (hart == 0 & !riscv_instr_pkg::support_pmp) begin
         gen_test_done();
-      end
-      // Shuffle the sub programs and insert to the instruction stream
+      end                     // 根据PMP的支持情况和处理器编号，选择性地生成“测试完成”部分的代码，以确保程序的正确执行和测试的完整性
+
+        
+      // Shuffle the sub programs and insert to the instruction stream   将子程序的指令流插入
       insert_sub_program(sub_program[hart], instr_stream);
       `uvm_info(`gfn, "Inserting sub-programs...done", UVM_LOW)
       `uvm_info(`gfn, "Main/sub program generation...done", UVM_LOW)
+
+        
       // Program end
-      gen_program_end(hart);
-      if (!cfg.bare_program_mode) begin
+        gen_program_end(hart);         // 调用gen_program_end(hart)函数生成程序结束部分的代码
+      if (!cfg.bare_program_mode) begin   // 如果当前配置不支持“裸程序模式”（bare program mode），则生成调试ROM部分的代码
         // Generate debug rom section
         if (riscv_instr_pkg::support_debug_mode) begin
           gen_debug_rom(hart);
         end
       end
-      gen_section({hart_prefix(hart), "instr_end"}, {"nop"});
+        gen_section({hart_prefix(hart), "instr_end"}, {"nop"}); // 调用gen_section函数生成一个名为“instr_end”的代码段，其中只包含一个“nop”指令,instr_stream.push_back()。
     end
-    for (int hart = 0; hart < cfg.num_of_harts; hart++) begin
+
+
+     
+     for (int hart = 0; hart < cfg.num_of_harts; hart++) begin    // 针对每个处理器（hart）生成相应的数据段、堆栈段和内核段
       // Starting point of data section
-      gen_data_page_begin(hart);
-      if(!cfg.no_data_page) begin
+        gen_data_page_begin(hart);    // 生成数据页的起始部分
+      if(!cfg.no_data_page) begin    //是否设置了禁止生成数据页的选项
         // User data section
-        gen_data_page(hart);
+         gen_data_page(hart);    // 生成用户数据段
         // AMO memory region
         if ((hart == 0) && (RV32A inside {supported_isa})) begin
-          gen_data_page(hart, .amo(1));
+           gen_data_page(hart, .amo(1));    // 如果当前处理器是主处理器（hart 0）且支持RV32A指令集，则调用gen_data_page(hart, .amo(1))函数生成AMO（原子内存操作）内存区域的数据段
         end
       end
+        
       // Stack section
-      gen_stack_section(hart);
+        gen_stack_section(hart);    // 生成堆栈段
+        
       if (!cfg.bare_program_mode) begin
         // Generate kernel program/data/stack section
-        gen_kernel_sections(hart);
+         gen_kernel_sections(hart); //  如果当前配置不是“裸程序模式”（bare program mode），则调用gen_kernel_sections(hart)函数生成内核程序、数据和堆栈段
       end
       // Page table
       if (!cfg.bare_program_mode) begin
-        gen_page_table_section(hart);
+         gen_page_table_section(hart); // 如果当前配置不是“裸程序模式”，则调用gen_page_table_section(hart)函数生成页表部分
       end
     end
   endfunction
@@ -251,27 +274,27 @@ class riscv_asm_program_gen extends uvm_object;
                                         bit is_debug = 1'b0,
                                         string prefix = "sub");
     if(num_sub_program > 0) begin
-      sub_program = new[num_sub_program];
+       sub_program = new[num_sub_program];    // 创建子程序数量的子程序
       foreach(sub_program[i]) begin
         sub_program[i] = riscv_instr_sequence::type_id::create(
                          get_label($sformatf("%s_%0d", prefix, i + 1), hart));
         `uvm_info(`gfn, $sformatf("sub program name: %s", sub_program[i].get_name()), UVM_LOW)
-        sub_program[i].is_debug_program = is_debug;
-        if (is_debug) begin
+         sub_program[i].is_debug_program = is_debug;   // 子程序是否为一个调试程序
+         if (is_debug) begin       // 根据是否为调试程序设置子程序的指令数量
           sub_program[i].instr_cnt = cfg.debug_sub_program_instr_cnt[i];
         end else begin
           sub_program[i].instr_cnt = cfg.sub_program_instr_cnt[i];
         end
-        generate_directed_instr_stream(.hart(hart),
+         generate_directed_instr_stream(.hart(hart),                           //  生成定向指令流，该函数使用多个参数，包括处理器编号、标签、原始指令数量、最小插入数量和指令流
                                        .label(sub_program[i].get_name()),
                                        .original_instr_cnt(sub_program[i].instr_cnt),
                                        .min_insert_cnt(0),
                                        .instr_stream(sub_program[i].directed_instr));
         sub_program[i].label_name = sub_program[i].get_name();
         sub_program[i].cfg = cfg;
-        `DV_CHECK_RANDOMIZE_FATAL(sub_program[i])
-        sub_program[i].gen_instr(.is_main_program(0), .no_branch(cfg.no_branch_jump));
-        sub_program_name.push_back(sub_program[i].label_name);
+         `DV_CHECK_RANDOMIZE_FATAL(sub_program[i]) // 调用随机化，并检查
+         sub_program[i].gen_instr(.is_main_program(0), .no_branch(cfg.no_branch_jump));    // 生成指令
+         sub_program_name.push_back(sub_program[i].label_name);   // 存放指令
       end
     end
   endfunction
@@ -321,22 +344,22 @@ class riscv_asm_program_gen extends uvm_object;
   // Major sections - init, stack, data, test_done etc.
   //---------------------------------------------------------------------------------------
 
-  virtual function void gen_program_header();
-    string str[$];
+   virtual function void gen_program_header();  // 这个函数的主要目的是生成程序的初始化部分，设置程序的基本结构和运行环境，同时为每个hart处理器核心生成对应的处理代码。
+     string str[$];   // 生成文件的头部
     instr_stream.push_back(".include \"user_define.h\"");
     instr_stream.push_back(".globl _start");
     instr_stream.push_back(".section .text");
-    if (cfg.disable_compressed_instr) begin
+     if (cfg.disable_compressed_instr) begin      // 禁止压缩指令
       instr_stream.push_back(".option norvc;");
     end
-    str.push_back(".include \"user_init.s\"");
-    str.push_back($sformatf("csrr x5, 0x%0x", MHARTID));
+     str.push_back(".include \"user_init.s\"");   // 引入一个名为user_init.s的用户初始化文件
+     str.push_back($sformatf("csrr x5, 0x%0x", MHARTID));  // 读取当前hart的ID值存储到寄存器中，为后续的处理提供必要的信息和设置
     for (int hart = 0; hart < cfg.num_of_harts; hart++) begin
       str = {str, $sformatf("li x6, %0d", hart),
                   $sformatf("beq x5, x6, %0df", hart)};
     end
-    gen_section("_start", str);
-    for (int hart = 0; hart < cfg.num_of_harts; hart++) begin
+     gen_section("_start", str);             // 把 str 加入 instr_stream 中
+     for (int hart = 0; hart < cfg.num_of_harts; hart++) begin  // 还是一些配置，处理器的核心有几个
       instr_stream.push_back($sformatf("%0d: la x%0d, h%0d_start", hart, cfg.scratch_reg, hart));
       instr_stream.push_back($sformatf("jalr x0, x%0d, 0", cfg.scratch_reg));
     end
@@ -1566,15 +1589,15 @@ class riscv_asm_program_gen extends uvm_object;
     riscv_rand_instr_stream new_instr_stream;
     int unsigned instr_insert_cnt;
     int unsigned idx;
-    uvm_coreservice_t coreservice = uvm_coreservice_t::get();
+     uvm_coreservice_t coreservice = uvm_coreservice_t::get();    //  使用UVM的核心基类 和工厂机制
     uvm_factory factory = coreservice.get_factory();
-    if(cfg.no_directed_instr) return;
-    foreach(directed_instr_stream_ratio[instr_stream_name]) begin
-      instr_insert_cnt = original_instr_cnt * directed_instr_stream_ratio[instr_stream_name] / 1000;
+     if(cfg.no_directed_instr) return;   // 如果不生成 定向测试
+     foreach(directed_instr_stream_ratio[instr_stream_name]) begin   // 不同定向指令的概率
+        instr_insert_cnt = original_instr_cnt * directed_instr_stream_ratio[instr_stream_name] / 1000;   // 设置计算需要插入的指令数量instr_insert_cnt。这个数量是原始指令数量original_instr_cnt和比率设置的乘积，并除以1000
       if(instr_insert_cnt <= min_insert_cnt) begin
         instr_insert_cnt = min_insert_cnt;
       end
-      `ifdef DSIM
+      `ifdef DSIM     // 和 vcs一样的仿真器
         // Temporarily skip loop instruction for dsim as it cannot support dynamic array
         // randomization
         if (uvm_is_match("*loop*", instr_stream_name)) begin
@@ -1586,24 +1609,24 @@ class riscv_asm_program_gen extends uvm_object;
                                  instr_stream_name, instr_insert_cnt, original_instr_cnt), UVM_LOW)
       for(int i = 0; i < instr_insert_cnt; i++) begin
         string name = $sformatf("%0s_%0d", instr_stream_name, i);
-        object_h = factory.create_object_by_name(instr_stream_name, get_full_name(), name);
+         object_h = factory.create_object_by_name(instr_stream_name, get_full_name(), name);   // 创建指令流
         if(object_h == null) begin
           `uvm_fatal(get_full_name(), $sformatf("Cannot create instr stream %0s", name))
         end
-        if($cast(new_instr_stream, object_h)) begin
+         if($cast(new_instr_stream, object_h)) begin      // 转换
           new_instr_stream.cfg = cfg;
           new_instr_stream.hart = hart;
           new_instr_stream.label = $sformatf("%0s_%0d", label, idx);
           new_instr_stream.kernel_mode = kernel_mode;
-          `DV_CHECK_RANDOMIZE_FATAL(new_instr_stream)
-          instr_stream = {instr_stream, new_instr_stream};
+            `DV_CHECK_RANDOMIZE_FATAL(new_instr_stream)     // 对new_instr_stream 进行随机化并检查
+            instr_stream = {instr_stream, new_instr_stream};  // 将随机化产生之后的new_instr_stream放在 instr_stream组中
         end else begin
           `uvm_fatal(get_full_name(), $sformatf("Cannot cast instr stream %0s", name))
         end
         idx++;
       end
     end
-    instr_stream.shuffle();
+     instr_stream.shuffle();   // 随机打乱数据
   endfunction
 
   //---------------------------------------------------------------------------------------
