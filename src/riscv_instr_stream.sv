@@ -185,19 +185,19 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
     end
   endfunction
 
-  virtual function void setup_allowed_instr(bit no_branch = 1'b0, bit no_load_store = 1'b1);
-    allowed_instr = riscv_instr::basic_instr;
-    if (no_branch == 0) begin
+  virtual function void setup_allowed_instr(bit no_branch = 1'b0, bit no_load_store = 1'b1);     //   设置允许生成的指令类型
+    allowed_instr = riscv_instr::basic_instr;              //   默认情况下，只能有basic_的指令        
+    if (no_branch == 0) begin                              //   允许分支指令
       allowed_instr = {allowed_instr, riscv_instr::instr_category[BRANCH]};
     end
-    if (no_load_store == 0) begin
+    if (no_load_store == 0) begin                          //   允许 load  store 指令
       allowed_instr = {allowed_instr, riscv_instr::instr_category[LOAD],
                                       riscv_instr::instr_category[STORE]};
     end
-    setup_instruction_dist(no_branch, no_load_store);
+    setup_instruction_dist(no_branch, no_load_store);      //   设置指令的分布情况
   endfunction
 
-  virtual function void randomize_avail_regs();
+  virtual function void randomize_avail_regs();           //   用于随机化avail_regs数组。avail_regs数组存储了可用的寄存器列表
     if(avail_regs.size() > 0) begin
       `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(avail_regs,
                                          unique{avail_regs};
@@ -210,7 +210,7 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
   endfunction
 
   function void setup_instruction_dist(bit no_branch = 1'b0, bit no_load_store = 1'b1);
-    if (cfg.dist_control_mode) begin
+    if (cfg.dist_control_mode) begin  // 分布比例  均匀分布 正态分布  自定义分布
       category_dist = cfg.category_dist;
       if (no_branch) begin
         category_dist[BRANCH] = 0;
@@ -223,30 +223,33 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
     end
   endfunction
 
-  virtual function void gen_instr(bit no_branch = 1'b0, bit no_load_store = 1'b1,
+virtual function void gen_instr(bit no_branch = 1'b0, bit no_load_store = 1'b1,   // 用于生成指令序列
                                   bit is_debug_program = 1'b0);
-    setup_allowed_instr(no_branch, no_load_store);
+  setup_allowed_instr(no_branch, no_load_store);  // 设置允许生成的指令类型。传递的参数为no_branch和no_load_store，用于控制是否允许生成分支指令和加载/存储指令
     foreach(instr_list[i]) begin
-      randomize_instr(instr_list[i], is_debug_program);
+      randomize_instr(instr_list[i], is_debug_program);    // randomize_instr函数对指令进行, 是否是调试指令  
     end
     // Do not allow branch instruction as the last instruction because there's no
-    // forward branch target
-    while (instr_list[$].category == BRANCH) begin
+    // forward branch target      保证最后一个指令不是分支跳转指令
+    while (instr_list[$].category == BRANCH) begin      // 如果最后一条指令是分支指令，则将其从instr_list中移除，并继续检查，直到最后一条指令不是分支指令或instr_list为空为止。
       void'(instr_list.pop_back());
       if (instr_list.size() == 0) break;
     end
   endfunction
 
-  function void randomize_instr(output riscv_instr instr,
-                                input  bit is_in_debug = 1'b0,
-                                input  bit disable_dist = 1'b0,
-                                input  riscv_instr_group_t include_group[$] = {});
-    riscv_instr_name_t exclude_instr[];
-    if ((SP inside {reserved_rd, cfg.reserved_regs}) ||
-        ((avail_regs.size() > 0) && !(SP inside {avail_regs}))) begin
-      exclude_instr = {C_ADDI4SPN, C_ADDI16SP, C_LWSP, C_LDSP};
+  function void randomize_instr(output riscv_instr instr,   //  存储生成的指令
+                                input  bit is_in_debug = 1'b0,    //  是否在调试模式下生成指令
+                                input  bit disable_dist = 1'b0,   //  用于禁用指令分布控制
+                                input  riscv_instr_group_t include_group[$] = {});    //  用于指定需要包含的指令组，默认为空
+    riscv_instr_name_t exclude_instr[];    //   用于存储需要排除的指令
+    if ((SP inside {reserved_rd, cfg.reserved_regs}) ||   //  如果堆栈指针（SP）在保留寄存器列表reserved_rd或cfg.reserved_regs中，这意味着SP寄存器被保留用于特定目的，不应该被生成的指令修改。
+                                                          //  因此，需要将一些与SP相关的指令排除，以防止错误地修改SP寄存器。
+        ((avail_regs.size() > 0) && !(SP inside {avail_regs}))) begin   //  其次，如果avail_regs数组不为空且SP不在avail_regs中，这意味着虽然有一些可用的寄存器，但堆栈指针（SP）不在可用寄存器列表中。
+                                                          //  这可能意味着SP寄存器被用于其他目的，或者不应该被生成的指令使用。因此，需要排除一些与SP相关的指令，以确保不会错误地使用SP寄存器
+      exclude_instr = {C_ADDI4SPN, C_ADDI16SP, C_LWSP, C_LDSP};    // 通过将与堆栈指针（SP）相关的指令添加到exclude_instr数组中，可以确保在随机生成指令时，不会选择这些需要排除的指令
     end
-    // Post-process the allowed_instr and exclude_instr lists to handle
+    
+    // Post-process the allowed_instr and exclude_instr lists to handle    // 是否包涵 EBREAK指令
     // adding ebreak instructions to the debug rom.
     if (is_in_debug) begin
       if (cfg.no_ebreak && cfg.enable_ebreak_in_debug_rom) begin
@@ -255,12 +258,13 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
         exclude_instr = {exclude_instr, EBREAK, C_EBREAK};
       end
     end
-    instr = riscv_instr::get_rand_instr(.include_instr(allowed_instr),
+    
+    instr = riscv_instr::get_rand_instr(.include_instr(allowed_instr),         //  **** 根据 allowed exclude  include_group  生成指令
                                         .exclude_instr(exclude_instr),
                                         .include_group(include_group));
-    instr.m_cfg = cfg;
-    randomize_gpr(instr);
-  endfunction
+    instr.m_cfg = cfg;               
+    randomize_gpr(instr);                //  对指令的通用寄存器进行随机
+  endfunction 
 
   function void randomize_gpr(riscv_instr instr);
     `DV_CHECK_RANDOMIZE_WITH_FATAL(instr,
