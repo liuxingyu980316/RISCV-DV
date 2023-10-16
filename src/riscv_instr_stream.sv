@@ -18,30 +18,32 @@
 // A instruction stream here is a  queue of RISC-V basic instructions.
 // This class also provides some functions to manipulate the instruction stream, like insert a new
 // instruction, mix two instruction streams etc.
+// RISC-V指令流的基础类
+// 这个基础类还提供了一些操作指令流的方法，比如插入新的指令，混合两个指令流等。
 class riscv_instr_stream extends uvm_object;
 
-  riscv_instr           instr_list[$];
-  int unsigned          instr_cnt;
-  string                label = "";
+  riscv_instr           instr_list[$];   // 动态数组，用于存储指令流中的指令
+  int unsigned          instr_cnt;       // 无符号整数，表示指令流中指令的数量
+  string                label = "";      // 标签
   // User can specify a small group of available registers to generate various hazard condition
-  rand riscv_reg_t      avail_regs[];
+  rand riscv_reg_t      avail_regs[];     // 指定一组可用的寄存器，以生成不同的冒险条件，指令执行过程中可能出现的竞争或冲突条件，比如写后读（RAW）、读后写（WAR）和写后写（WAW）等冒险
   // Some additional reserved registers that should not be used as rd register
   // by this instruction stream
-  riscv_reg_t           reserved_rd[];
-  int                   hart;
+  riscv_reg_t           reserved_rd[];    // 包含一些额外的保留寄存器，这些寄存器不应作为指令流的rd寄存器使用
+  int                   hart;             // 线程，核的编号 
 
-  `uvm_object_utils(riscv_instr_stream)
-  `uvm_object_new
+  `uvm_object_utils(riscv_instr_stream)   // 可以使用打印、比较、复制等
+  `uvm_object_new                         // 创建riscv_instr_stream类的新实例
 
-  // Initialize the instruction stream, create each instruction instance
+  // Initialize the instruction stream, create each instruction instance    用于初始化指令流并创建每个指令实例
   function void initialize_instr_list(int unsigned instr_cnt);
     instr_list = {};
-    this.instr_cnt = instr_cnt;
+    this.instr_cnt = instr_cnt;     // initial 并且传入指令的数量
     create_instr_instance();
   endfunction
 
   virtual function void create_instr_instance();
-    riscv_instr instr;
+    riscv_instr instr;             // 创建指令，并添在list末尾
     for(int i = 0; i < instr_cnt; i++) begin
       instr = riscv_instr::type_id::create($sformatf("instr_%0d", i));
       instr_list.push_back(instr);
@@ -49,14 +51,15 @@ class riscv_instr_stream extends uvm_object;
   endfunction
 
   // Insert an instruction to the existing instruction stream at the given index
-  // When index is -1, the instruction is injected at a random location
+  // When index is -1, the instruction is injected at a random location  // 用于将给定的指令instr插入到现有的指令流instr_list中的指定索引idx处。
+  // 函数接受两个参数，instr是要插入的指令实例，idx是要插入的位置索引。如果idx的值为-1，那么指令将被注入到一个随机位置。
   function void insert_instr(riscv_instr instr, int idx = -1);
-    int current_instr_cnt = instr_list.size();
+    int current_instr_cnt = instr_list.size();     // 获取list的size
     if (current_instr_cnt == 0) begin
       idx = 0;
     end else if (idx == -1) begin
       idx = $urandom_range(0, current_instr_cnt-1);
-      while(instr_list[idx].atomic) begin
+      while(instr_list[idx].atomic) begin // 是否是原子指令
        idx += 1;
        if (idx == current_instr_cnt - 1) begin
          instr_list = {instr_list, instr};
@@ -73,7 +76,8 @@ class riscv_instr_stream extends uvm_object;
   // Insert an instruction to the existing instruction stream at the given index
   // When index is -1, the instruction is injected at a random location
   // When replace is 1, the original instruction at the inserted position will be replaced
-  function void insert_instr_stream(riscv_instr new_instr[], int idx = -1, bit replace = 1'b0);
+  // 把一串的指令流插入当前指令流中
+  function void _stream(riscv_instr new_instr[], int idx = -1, bit replace = 1'b0);
     int current_instr_cnt = instr_list.size();
     int new_instr_cnt = new_instr.size();
     if(current_instr_cnt == 0) begin
@@ -122,29 +126,30 @@ class riscv_instr_stream extends uvm_object;
   // Mix the input instruction stream with the original instruction, the instruction order is
   // preserved. When 'contained' is set, the original instruction stream will be inside the
   // new instruction stream with the first and last instruction from the input instruction stream.
+  // 融合两个指令流
   function void mix_instr_stream(riscv_instr new_instr[], bit contained = 1'b0);
     int current_instr_cnt = instr_list.size();
-    int insert_instr_position[];
+    int _position[];
     int new_instr_cnt = new_instr.size();
-    insert_instr_position = new[new_instr_cnt];
-    `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(insert_instr_position,
-      foreach(insert_instr_position[i]) {
-        insert_instr_position[i] inside {[0:current_instr_cnt-1]};
+    _position = new[new_instr_cnt];
+    `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(_position,
+      foreach(_position[i]) {
+        _position[i] inside {[0:current_instr_cnt-1]};
       })
-    if (insert_instr_position.size() > 0) begin
-      insert_instr_position.sort();
+    if (_position.size() > 0) begin
+      _position.sort();
     end
     if(contained) begin
-      insert_instr_position[0] = 0;
+      _position[0] = 0;
       if(new_instr_cnt > 1)
-        insert_instr_position[new_instr_cnt-1] = current_instr_cnt-1;
+        _position[new_instr_cnt-1] = current_instr_cnt-1;
     end
     foreach(new_instr[i]) begin
-      insert_instr(new_instr[i], insert_instr_position[i] + i);
+      (new_instr[i], insert_instr_position[i] + i);
     end
   endfunction
 
-  function string convert2string();
+ function string convert2string();  // 流指令转换成 asm汇编指令
     string str;
     foreach(instr_list[i])
       str = {str, instr_list[i].convert2asm(), "\n"};
@@ -159,12 +164,16 @@ endclass
 // 2. For long instruction stream (>1K), randomize() all instructions together might take a long
 // time for the constraint solver. In this case, you can call gen_instr to generate instructions
 // one by one. The time only grows linearly with the instruction count
+// 生成基于配置的随机指令流
+// 对于短指令流，可以直接调用randomize()方法
+// 对于长指令流（大于1K），将所有指令一起随机化可能需要很长时间，因为约束求解器需要处理大量的指令。
+// 在这种情况下，可以调用gen_instr方法来逐个生成指令。这样可以降低生成指令流的时间复杂度，使其仅随指令数量的增加而线性增长
 class riscv_rand_instr_stream extends riscv_instr_stream;
 
-  riscv_instr_gen_config  cfg;
-  bit                     kernel_mode;
-  riscv_instr_name_t      allowed_instr[$];
-  int unsigned            category_dist[riscv_instr_category_t];
+  riscv_instr_gen_config  cfg;                                     //  指令生成器的配置信息
+  bit                     kernel_mode;                             //  是否处于内核模式
+  riscv_instr_name_t      allowed_instr[$];                        //  允许生成的指令名称
+  int unsigned            category_dist[riscv_instr_category_t];   //  不同指令类别的分布信息
 
   `uvm_object_utils(riscv_rand_instr_stream)
   `uvm_object_new
@@ -172,7 +181,7 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
   virtual function void create_instr_instance();
     riscv_instr instr;
     for (int i = 0; i < instr_cnt; i++) begin
-      instr_list.push_back(null);
+      instr_list.push_back(null);                     // 预先分配空间
     end
   endfunction
 
