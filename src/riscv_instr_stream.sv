@@ -299,7 +299,7 @@ virtual function void gen_instr(bit no_branch = 1'b0, bit no_load_store = 1'b1, 
     )
   endfunction
 
-  function riscv_instr get_init_gpr_instr(riscv_reg_t gpr, bit [XLEN-1:0] val);
+  function riscv_instr get_init_gpr_instr(riscv_reg_t gpr, bit [XLEN-1:0] val);   //  随机初始化通用寄存器
     riscv_pseudo_instr li_instr;
     li_instr = riscv_pseudo_instr::type_id::create("li_instr");
     `DV_CHECK_RANDOMIZE_WITH_FATAL(li_instr,
@@ -310,7 +310,7 @@ virtual function void gen_instr(bit no_branch = 1'b0, bit no_load_store = 1'b1, 
     return li_instr;
   endfunction
 
-  function void add_init_vector_gpr_instr(riscv_vreg_t gpr, bit [XLEN-1:0] val);
+  function void add_init_vector_gpr_instr(riscv_vreg_t gpr, bit [XLEN-1:0] val);   //   随机初始化通用向量寄存器
     riscv_vector_instr instr;
     $cast(instr, riscv_instr::get_instr(VMV));
     instr.m_cfg = cfg;
