@@ -266,9 +266,9 @@ virtual function void gen_instr(bit no_branch = 1'b0, bit no_load_store = 1'b1, 
     randomize_gpr(instr);                //  对指令的通用寄存器进行随机
   endfunction 
 
-  function void randomize_gpr(riscv_instr instr);
+ function void randomize_gpr(riscv_instr instr);     // 用于指令的通用寄存器的constrain_with 随机
     `DV_CHECK_RANDOMIZE_WITH_FATAL(instr,
-      if (avail_regs.size() > 0) {
+    if (avail_regs.size() > 0) {   // with
         if (has_rs1) {
           rs1 inside {avail_regs};
         }
@@ -279,7 +279,7 @@ virtual function void gen_instr(bit no_branch = 1'b0, bit no_load_store = 1'b1, 
           rd  inside {avail_regs};
         }
       }
-      foreach (reserved_rd[i]) {
+          foreach (reserved_rd[i]) {         //  with
         if (has_rd) {
           rd != reserved_rd[i];
         }
@@ -287,12 +287,12 @@ virtual function void gen_instr(bit no_branch = 1'b0, bit no_load_store = 1'b1, 
           rs1 != reserved_rd[i];
         }
       }
-      foreach (cfg.reserved_regs[i]) {
+          foreach (cfg.reserved_regs[i]) {     //  with
         if (has_rd) {
-          rd != cfg.reserved_regs[i];
+          rd != cfg.reserved_regs[i];     //  确保rd寄存器的值不等于reserved_rd数组中的任何元素
         }
         if (format == CB_FORMAT) {
-          rs1 != cfg.reserved_regs[i];
+          rs1 != cfg.reserved_regs[i];    // 确保rd寄存器的值不等于cfg.reserved_regs数组中
         }
       }
       // TODO: Add constraint for CSR, floating point register
