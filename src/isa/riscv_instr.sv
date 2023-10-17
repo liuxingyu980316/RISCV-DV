@@ -36,7 +36,7 @@ class riscv_instr extends uvm_object;
   riscv_instr_format_t       format;     //  指令的格式或结构
   riscv_instr_category_t     category;   //  指令的更大范围的分类
   riscv_instr_name_t         instr_name;  //  指令的名字
-  imm_t                      imm_type;    //  指令的立即数
+  imm_t                      imm_type;    //  指令的立即数类型
   bit [4:0]                  imm_len;     //  立即数的长度
 
   // Operands
@@ -179,68 +179,71 @@ class riscv_instr extends uvm_object;
     end
   endfunction : build_basic_instruction_list
 
-      static function riscv_instr get_rand_instr(riscv_instr instr_h = null,        //     得到一个随机的指令
-                                                 riscv_instr_name_t include_instr[$] = {},  //  
-                                             riscv_instr_name_t exclude_instr[$] = {},
-                                             riscv_instr_category_t include_category[$] = {},
-                                             riscv_instr_category_t exclude_category[$] = {},
-                                             riscv_instr_group_t include_group[$] = {},
-                                             riscv_instr_group_t exclude_group[$] = {});
-     int unsigned idx;
-     riscv_instr_name_t name;
-     riscv_instr_name_t allowed_instr[$];
-     riscv_instr_name_t disallowed_instr[$];
-     riscv_instr_category_t allowed_categories[$];
-     foreach (include_category[i]) begin
+      static function riscv_instr get_rand_instr(riscv_instr instr_h = null,        //     得到一个随机的指令  //  函数将基于该指令来生成一个随机指令。
+                                                 riscv_instr_name_t include_instr[$] = {},   //  提供了该列表，函数将仅从这些指令中随机选择一个
+                                                 riscv_instr_name_t exclude_instr[$] = {},   //  要排除的指令名称列表
+                                                 riscv_instr_category_t include_category[$] = {},  //  指令类别列表,函数将仅从这些类别的指令中随机选择一个
+                                                 riscv_instr_category_t exclude_category[$] = {},  //  排除的指令类别列表
+                                                 riscv_instr_group_t include_group[$] = {},  //  要包含的指令组列表
+                                                 riscv_instr_group_t exclude_group[$] = {}); //  表示要排除的指令组列表
+     int unsigned idx;                           //  插入位置
+     riscv_instr_name_t name;                    //  指令名
+        riscv_instr_name_t allowed_instr[$];     //  允许的指令
+        riscv_instr_name_t disallowed_instr[$];  //  不允许的指令
+
+        foreach (include_category[i]) begin      // 从include类别里 选出来加到allowed指令里
        allowed_instr = {allowed_instr, instr_category[include_category[i]]};
      end
-     foreach (exclude_category[i]) begin
+        foreach (exclude_category[i]) begin       //  剔除的指令
        if (instr_category.exists(exclude_category[i])) begin
          disallowed_instr = {disallowed_instr, instr_category[exclude_category[i]]};
        end
      end
-     foreach (include_group[i]) begin
+        foreach (include_group[i]) begin    //  允许的群组
        allowed_instr = {allowed_instr, instr_group[include_group[i]]};
      end
-     foreach (exclude_group[i]) begin
+        foreach (exclude_group[i]) begin     //  剔除的群组
        if (instr_group.exists(exclude_group[i])) begin
          disallowed_instr = {disallowed_instr, instr_group[exclude_group[i]]};
        end
      end
-     disallowed_instr = {disallowed_instr, exclude_instr};
-     if (disallowed_instr.size() == 0) begin
-       if (include_instr.size() > 0) begin
+        disallowed_instr = {disallowed_instr, exclude_instr};   // 剔除的指令名
+    if (disallowed_instr.size() == 0) begin  // 没有要剔除的指令的话
+      if (include_instr.size() > 0) begin    //  从包含的指令里面随机选一个
          idx = $urandom_range(0, include_instr.size()-1);
          name = include_instr[idx];
-       end else if (allowed_instr.size() > 0) begin
+       end 
+      else if (allowed_instr.size() > 0) begin    //  从allowe_instr里随机选一个
          idx = $urandom_range(0, allowed_instr.size()-1);
          name = allowed_instr[idx];
-       end else begin
-         idx = $urandom_range(0, instr_names.size()-1);
+       end 
+       else begin
+         idx = $urandom_range(0, instr_names.size()-1);  //  从所有的里面指令名字里选一个
          name = instr_names[idx];
        end
-     end else begin
+     end 
+    else begin              //  有要剔除的指令
        if (!std::randomize(name) with {
-          name inside {instr_names};
+         name inside {instr_names};    //   在所有的指令里面选
           if (include_instr.size() > 0) {
-            name inside {include_instr};
+            name inside {include_instr};   //  如果有include_instr, 就在这里面选，这个变量是外部传进来的
           }
-          if (allowed_instr.size() > 0) {
+            if (allowed_instr.size() > 0) {   //  如果有allowed_instr, 就在这里面选
             name inside {allowed_instr};
           }
-          if (disallowed_instr.size() > 0) {
+              if (disallowed_instr.size() > 0) {   //  如果有disallowed_instr, 就排除这些指令
             !(name inside {disallowed_instr});
           }
        }) begin
          `uvm_fatal("riscv_instr", "Cannot generate random instruction")
        end
      end
-     // Shallow copy for all relevant fields, avoid using create() to improve performance
-     instr_h = new instr_template[name];
+         // Shallow copy for all relevant fields, avoid using create() to improve performance   创建一个新的指令实例并返回
+         instr_h = new instr_template[name];     //  riscv_instr instr_h ;riscv_instr  instr_template[riscv_instr_name_t];  riscv_instr_name_t name；开辟1个空间，并使用name这个变量进行存储riscv_instr指令
      return instr_h;
   endfunction : get_rand_instr
 
-  static function riscv_instr get_load_store_instr(riscv_instr_name_t load_store_instr[$] = {});
+ static function riscv_instr get_load_store_instr(riscv_instr_name_t load_store_instr[$] = {});   // 获取一个加载（load）或存储（store）类型的RISC-V指令  包含一个可选择的指令列表，如果没有就默认可以选择所有的LD SD指令
      riscv_instr instr_h;
      int unsigned idx;
      int unsigned i;
@@ -249,7 +252,7 @@ class riscv_instr extends uvm_object;
        load_store_instr = {instr_category[LOAD], instr_category[STORE]};
      end
      // Filter out unsupported load/store instruction
-     if (unsupported_instr.size() > 0) begin
+     if (unsupported_instr.size() > 0) begin                 // 函数检查是否存在不支持的加载或存储指令,删除其中的不支持指令
        while (i < load_store_instr.size()) begin
          if (load_store_instr[i] inside {unsupported_instr}) begin
            load_store_instr.delete(i);
@@ -258,20 +261,20 @@ class riscv_instr extends uvm_object;
          end
        end
      end
-     if (load_store_instr.size() == 0) begin
+     if (load_store_instr.size() == 0) begin     // 没有找到可用的加载或存储指令，函数将报告错误并退出
        $error("Cannot find available load/store instruction");
        $fatal(1);
      end
-     idx = $urandom_range(0, load_store_instr.size()-1);
+     idx = $urandom_range(0, load_store_instr.size()-1);      //  然后，函数随机选择一个加载或存储指令名称，并使用该名称创建一个新的指令实例
      name = load_store_instr[idx];
      // Shallow copy for all relevant fields, avoid using create() to improve performance
-     instr_h = new instr_template[name];
+     instr_h = new instr_template[name];     //  对于所有相关的字段进行浅拷贝，避免使用 create() 函数来提高性能
      return instr_h;
   endfunction : get_load_store_instr
 
-  static function riscv_instr get_instr(riscv_instr_name_t name);
+  static function riscv_instr get_instr(riscv_instr_name_t name);     //  获取一个指定名称的 RISC-V 指令
      riscv_instr instr_h;
-     if (!instr_template.exists(name)) begin
+     if (!instr_template.exists(name)) begin      //  检查这个名称的指令是否存在
        `uvm_fatal("riscv_instr", $sformatf("Cannot get instr %0s", name.name()))
      end
      // Shallow copy for all relevant fields, avoid using create() to improve performance
@@ -280,64 +283,64 @@ class riscv_instr extends uvm_object;
   endfunction : get_instr
 
   // Disable the rand mode for unused operands to randomization performance
-  virtual function void set_rand_mode();
-    case (format) inside
-      R_FORMAT : has_imm = 1'b0;
-      I_FORMAT : has_rs2 = 1'b0;
-      S_FORMAT, B_FORMAT : has_rd = 1'b0;
-      U_FORMAT, J_FORMAT : begin
+  virtual function void set_rand_mode();     //   禁用未使用的操作数
+    case (format) inside                     //   riscv_instr_format_t       format;     //  指令的格式或结构 和 group类似
+      R_FORMAT : has_imm = 1'b0;             //   R型指令没有imm
+      I_FORMAT : has_rs2 = 1'b0;             //   I型指令没有rs2
+      S_FORMAT, B_FORMAT : has_rd = 1'b0;    //   S B型指令没有rd
+      U_FORMAT, J_FORMAT : begin             //   U J型指令没有rs1 rs2
         has_rs1 = 1'b0;
         has_rs2 = 1'b0;
       end
     endcase
   endfunction
 
-  function void pre_randomize();
+ function void pre_randomize();      //   设置 rs rd imm 等的随机是否开启
     rs1.rand_mode(has_rs1);
     rs2.rand_mode(has_rs2);
     rd.rand_mode(has_rd);
     imm.rand_mode(has_imm);
-    if (category != CSR) begin
+   if (category != CSR) begin       //  如果不是CSR的指令类别，就不对csr进行随机
       csr.rand_mode(0);
     end
   endfunction
 
-  virtual function void set_imm_len();
-    if(format inside {U_FORMAT, J_FORMAT}) begin
+ virtual function void set_imm_len();     //  设置imm 的长度
+   if(format inside {U_FORMAT, J_FORMAT}) begin       // U J型指令  imm_len =20
       imm_len = 20;
     end else if(format inside {I_FORMAT, S_FORMAT, B_FORMAT}) begin
-      if(imm_type == UIMM) begin
+      if(imm_type == UIMM) begin    // I S B 根据 imm_type 设置
         imm_len = 5;
       end else begin
         imm_len = 12;
       end
     end
-    imm_mask = imm_mask << imm_len;
+    imm_mask = imm_mask << imm_len;   //  移动立即数的掩码，以产生立即数
   endfunction
 
-  virtual function void extend_imm();
+  virtual function void extend_imm();   //  对立即数进行符号拓展
     bit sign;
     imm = imm << (32 - imm_len);
     sign = imm[31];
-    imm = imm >> (32 - imm_len);
+    imm = imm >> (32 - imm_len);       //  上面的操作是提取符号位
     // Signed extension
     if (sign && !((format == U_FORMAT) || (imm_type inside {UIMM, NZUIMM}))) begin
-      imm = imm_mask | imm;
+      imm = imm_mask | imm;         //  如果是有符号数 或者是上面的这些情况 进行符号位的拓展
     end
   endfunction : extend_imm
 
-  function void post_randomize();
+  function void post_randomize();     //   在随机化的最后进行符号位的拓展及更新立即数
     extend_imm();
-    update_imm_str();
+    update_imm_str();                //  imm_str = $sformatf("%0d", $signed(imm));
   endfunction : post_randomize
 
-  // Convert the instruction to assembly code
+  // Convert the instruction to assembly code      指令转换为汇编代码
   virtual function string convert2asm(string prefix = "");
-    string asm_str;
-    asm_str = format_string(get_instr_name(), MAX_INSTR_STR_LEN);
-    if(category != SYSTEM) begin
-      case(format)
-        J_FORMAT, U_FORMAT : // instr rd,imm
+    string asm_str;                      //  储存生成的汇编语句   
+    asm_str = format_string(get_instr_name(), MAX_INSTR_STR_LEN);    将指令的名称 get_instr_name() 格式化为一个固定长度的字符串（MAX_INSTR_STR_LEN），并将结果存储在 asm_str 
+    if(category != SYSTEM) begin                 //  针对不同的指令格式和类别，生成相应的汇编代码字符串
+      case(format)                               //  根据指令的类型  R型 J型 U型 ...
+        J_FORMAT, U_FORMAT : // instr rd,imm     //  J 型指令的写法 
           asm_str = $sformatf("%0s%0s, %0s", asm_str, rd.name(), get_imm());
         I_FORMAT: // instr rd,rs1,imm
           if(instr_name == NOP)
@@ -345,12 +348,12 @@ class riscv_instr extends uvm_object;
           else if(instr_name == WFI)
             asm_str = "wfi";
           else if(instr_name == FENCE)
-            asm_str = $sformatf("fence"); // TODO: Support all fence combinations
+            asm_str = $sformatf("fence"); // TODO: Support all fence combinations                    //  ***** 转换成汇编语言的格式
           else if(instr_name == FENCE_I)
             asm_str = "fence.i";
-          else if(category == LOAD) // Use psuedo instruction format
+          else if(category == LOAD) // Use psuedo instruction format LD指令
             asm_str = $sformatf("%0s%0s, %0s(%0s)", asm_str, rd.name(), get_imm(), rs1.name());
-          else
+          else         
             asm_str = $sformatf("%0s%0s, %0s, %0s", asm_str, rd.name(), rs1.name(), get_imm());
         S_FORMAT, B_FORMAT: // instr rs1,rs2,imm
           if(category == STORE) // Use psuedo instruction format
@@ -366,19 +369,20 @@ class riscv_instr extends uvm_object;
         default: `uvm_fatal(`gfn, $sformatf("Unsupported format %0s [%0s]",
                                             format.name(), instr_name.name()))
       endcase
-    end else begin
+    end 
+    else begin
       // For EBREAK,C.EBREAK, making sure pc+4 is a valid instruction boundary
       // This is needed to resume execution from epc+4 after ebreak handling
       if(instr_name == EBREAK) begin
-        asm_str = ".4byte 0x00100073 # ebreak";
+        asm_str = ".4byte 0x00100073 # ebreak";       //  EBREAK 指令
       end
     end
     if(comment != "")
-      asm_str = {asm_str, " #",comment};
-    return asm_str.tolower();
+      asm_str = {asm_str, " #",comment};              //   指令的注释
+    return asm_str.tolower();                     //   全部转换成小写
   endfunction
 
-  function bit [6:0] get_opcode();
+  function bit [6:0] get_opcode();         // 根据指令名获得opcode
     case (instr_name) inside
       LUI                                                          : get_opcode = 7'b0110111;
       AUIPC                                                        : get_opcode = 7'b0010111;
@@ -401,7 +405,7 @@ class riscv_instr extends uvm_object;
   endfunction
 
   virtual function bit [2:0] get_func3();
-    case (instr_name) inside
+    case (instr_name) inside        // 根据指令名获得func3
       JALR       : get_func3 = 3'b000;
       BEQ        : get_func3 = 3'b000;
       BNE        : get_func3 = 3'b001;
@@ -471,8 +475,8 @@ class riscv_instr extends uvm_object;
     endcase
   endfunction
 
-  function bit [6:0] get_func7();
-    case (instr_name)
+  function bit [6:0] get_func7(); 
+    case (instr_name)        // 根据指令名获得func7
       SLLI   : get_func7 = 7'b0000000;
       SRLI   : get_func7 = 7'b0000000;
       SRAI   : get_func7 = 7'b0100000;
@@ -522,8 +526,8 @@ class riscv_instr extends uvm_object;
   endfunction
 
   // Convert the instruction to assembly code
-  virtual function string convert2bin(string prefix = "");
-    string binary;
+  virtual function string convert2bin(string prefix = "");     //  将指令转换为二进制代码 //prefix是前缀 可能是 0X
+    string binary;                   //    根据不同的指令生成二进制代码
     case(format)
       J_FORMAT: begin
           binary = $sformatf("%8h", {imm[20], imm[10:1], imm[11], imm[19:12], rd,  get_opcode()});
@@ -563,10 +567,10 @@ class riscv_instr extends uvm_object;
       end
       default: `uvm_fatal(`gfn, $sformatf("Unsupported format %0s", format.name()))
     endcase
-    return {prefix, binary};
+    return {prefix, binary};   //prefix是前缀 可能是 0X
   endfunction
 
-  virtual function string get_instr_name();
+  virtual function string get_instr_name();    //  获取指令的名称，并将其中的下划线（"_"）替换为点号（"."）
     get_instr_name = instr_name.name();
     foreach(get_instr_name[i]) begin
       if (get_instr_name[i] == "_") begin
@@ -576,7 +580,7 @@ class riscv_instr extends uvm_object;
     return get_instr_name;
   endfunction
 
-  // Get RVC register name for CIW, CL, CS, CB format
+  // Get RVC register name for CIW, CL, CS, CB format    RISC-V 压缩指令集寄存器名称，寄存器的编号被压缩为三位比特
   function bit [2:0] get_c_gpr(riscv_reg_t gpr);
     return gpr[2:0];
   endfunction
@@ -587,7 +591,7 @@ class riscv_instr extends uvm_object;
     return imm_str;
   endfunction
 
-  virtual function void clear_unused_label();
+  virtual function void clear_unused_label();    //  优化指令的表示或清除不必要的标签信息
     if(has_label && !is_branch_target && is_local_numeric_label) begin
       has_label = 1'b0;
     end
@@ -596,7 +600,8 @@ class riscv_instr extends uvm_object;
   virtual function void do_copy(uvm_object rhs);
     riscv_instr rhs_;
     super.copy(rhs);
-    assert($cast(rhs_, rhs));
+    assert($cast(rhs_, rhs)); // rhs_ = rhs;
+    
     this.group          = rhs_.group;
     this.format         = rhs_.format;
     this.category       = rhs_.category;
@@ -618,7 +623,7 @@ class riscv_instr extends uvm_object;
   endfunction : do_copy
 
   virtual function void update_imm_str();
-    imm_str = $sformatf("%0d", $signed(imm));
+    imm_str = $sformatf("%0d", $signed(imm));    //  imm 转换成 二进制
   endfunction
 
   `include "isa/riscv_instr_cov.svh"
