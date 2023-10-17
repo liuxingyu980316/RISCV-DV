@@ -179,8 +179,8 @@ class riscv_instr extends uvm_object;
     end
   endfunction : build_basic_instruction_list
 
-  static function riscv_instr get_rand_instr(riscv_instr instr_h = null,
-                                             riscv_instr_name_t include_instr[$] = {},
+      static function riscv_instr get_rand_instr(riscv_instr instr_h = null,        //     得到一个随机的指令
+                                                 riscv_instr_name_t include_instr[$] = {},  //  
                                              riscv_instr_name_t exclude_instr[$] = {},
                                              riscv_instr_category_t include_category[$] = {},
                                              riscv_instr_category_t exclude_category[$] = {},
