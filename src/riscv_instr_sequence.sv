@@ -47,9 +47,9 @@
 
 class riscv_instr_sequence extends uvm_sequence;
 
-  int unsigned             instr_cnt;            // Instruction count of this sequence
-  riscv_push_stack_instr   instr_stack_enter;    // Stack push instructions for sub-programs
-  riscv_pop_stack_instr    instr_stack_exit;     // Stack pop instructions for sub-programs
+  int unsigned             instr_cnt;            // Instruction count of this sequence             表示该指令序列中的指令数量
+  riscv_push_stack_instr   instr_stack_enter;    // Stack push instructions for sub-programs       子程序的栈推入（push）指令
+  riscv_pop_stack_instr    instr_stack_exit;     // Stack pop instructions for sub-programs        子程序的栈弹出（pop）指令
   riscv_rand_instr_stream  instr_stream;         // Main instruction streams
   bit                      is_main_program;      // Type of this sequence (main or sub program)
   bit                      is_debug_program;     // Indicates whether sequence is debug program
