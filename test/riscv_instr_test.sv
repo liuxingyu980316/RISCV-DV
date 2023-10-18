@@ -50,7 +50,7 @@ class riscv_instr_test extends riscv_instr_base_test;
     `uvm_info(get_full_name(), $sformatf("%0s is generated", test_name), UVM_LOW)
   endtask
 
-  virtual function void randomize_cfg();
+  virtual function void randomize_cfg();                //  和base中的是一样的，不太清楚为什么在extend之后再写一次。 对cfg进行随机
     `DV_CHECK_RANDOMIZE_FATAL(cfg);
     `uvm_info(`gfn, $sformatf("riscv_instr_gen_config is randomized:\n%0s",
                     cfg.sprint()), UVM_LOW)
