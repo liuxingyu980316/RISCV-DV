@@ -25,22 +25,22 @@ package riscv_instr_pkg;
   import uvm_pkg::*;
   import riscv_signature_pkg::*;
 
-  `define include_file(f) `include `"f`"
+  `define include_file(f) `include `"f`"       //   在代码中使用 include_file(filename) 时，预处理器会将其替换为 include "filename"
 
-  uvm_cmdline_processor  inst;
+  uvm_cmdline_processor  inst;                 //   用于处理命令行参数
 
-  // Data section setting
+  // Data section setting       用于描述内存区域的相关设置
   typedef struct {
-    string         name;
-    int unsigned   size_in_bytes;
-    bit [2:0]      xwr; // Excutable,Writable,Readale
+    string         name;        // 内存区域的名称
+    int unsigned   size_in_bytes;   //   内存区域的大小
+    bit [2:0]      xwr; // Excutable,Writable,Readale   //   内存区域的属性:可执行（Executable）、可写（Writable）和可读（Readable）
   } mem_region_t;
 
-  // Initialization of the vregs
+  // Initialization of the vregs   虚拟寄存器的初始化方法
   typedef enum {
-    SAME_VALUES_ALL_ELEMS,
-    RANDOM_VALUES_VMV,
-    RANDOM_VALUES_LOAD
+    SAME_VALUES_ALL_ELEMS,       //    虚拟寄存器的元素初始化为相同的值
+    RANDOM_VALUES_VMV,           //    随机值初始化虚拟寄存器  涉及到向量移动指令
+    RANDOM_VALUES_LOAD           //    随机值初始化虚拟寄存器  涉及到数据加载移动指令
   } vreg_init_method_t;
 
   typedef enum bit [3:0] {
@@ -50,7 +50,7 @@ package riscv_instr_pkg;
     SV48 = 4'b1001,
     SV57 = 4'b1010,
     SV64 = 4'b1011
-  } satp_mode_t;
+  } satp_mode_t;                 //   设置或区分不同的地址空间
 
   typedef enum bit [2:0] {
     RNE = 3'b000,
@@ -58,19 +58,19 @@ package riscv_instr_pkg;
     RDN = 3'b010,
     RUP = 3'b011,
     RMM = 3'b100
-  } f_rounding_mode_t;
+  } f_rounding_mode_t;            //     浮点的类型
 
   typedef enum bit [1:0] {
     DIRECT   = 2'b00,
     VECTORED = 2'b01
-  } mtvec_mode_t;
+  } mtvec_mode_t;                 //  Machine Trap Vector Base Address Register  中断、异常处理的模式
 
   typedef enum bit [2:0] {
     IMM,    // Signed immediate
     UIMM,   // Unsigned immediate
     NZUIMM, // Non-zero unsigned immediate
     NZIMM   // Non-zero signed immediate
-  } imm_t;
+  } imm_t;                        //  立即数的模式     
 
   // Privileged mode
   typedef enum bit [1:0] {
@@ -78,7 +78,7 @@ package riscv_instr_pkg;
     SUPERVISOR_MODE = 2'b01,
     RESERVED_MODE   = 2'b10,
     MACHINE_MODE    = 2'b11
-  } privileged_mode_t;
+  } privileged_mode_t;             //   特权模式
 
   typedef enum bit [4:0] {
     RV32I,
@@ -651,29 +651,29 @@ package riscv_instr_pkg;
     `include "isa/custom/riscv_custom_instr_enum.sv"
     // You can add other instructions here
     INVALID_INSTR
-  } riscv_instr_name_t;
+  } riscv_instr_name_t;                //  指令名
 
   // Maximum virtual address bits used by the program
-  parameter int MAX_USED_VADDR_BITS = 30;
-
-  parameter int SINGLE_PRECISION_FRACTION_BITS = 23;
-  parameter int DOUBLE_PRECISION_FRACTION_BITS = 52;
+  parameter int MAX_USED_VADDR_BITS = 30;                //  最大虚拟地址位数
+  parameter int SINGLE_PRECISION_FRACTION_BITS = 23;     //  单精度浮点数的小数部分的位数
+  parameter int DOUBLE_PRECISION_FRACTION_BITS = 52;     //  双精度浮点数的小数部分的位数
 
   typedef enum bit [4:0] {
     ZERO = 5'b00000,
     RA, SP, GP, TP, T0, T1, T2, S0, S1, A0, A1, A2, A3, A4, A5, A6, A7,
     S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, T3, T4, T5, T6
-  } riscv_reg_t;
+  } riscv_reg_t;               //   寄存器   RA:返回地址寄存器   SP：栈指针寄存器   GP：全局指针寄存器   TP: 线程指针寄存器   T0 - T3：临时寄存器   S0 - S11：保存寄存器    A0 - A7：函数参数和返回值寄存器
+
 
   typedef enum bit [4:0] {
     FT0, FT1, FT2, FT3, FT4, FT5, FT6, FT7, FS0, FS1, FA0, FA1, FA2, FA3, FA4, FA5,
     FA6, FA7, FS2, FS3, FS4, FS5, FS6, FS7, FS8, FS9, FS10, FS11, FT8, FT9, FT10, FT11
-  } riscv_fpr_t;
+  } riscv_fpr_t;             //    浮点寄存器   
 
   typedef enum bit [4:0] {
     V0, V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15,
     V16, V17, V18, V19, V20, V21, V22, V23, V24, V25, V26, V27, V28, V29, V30, V31
-  } riscv_vreg_t;
+  } riscv_vreg_t;           //    向量寄存器
 
   typedef enum bit [5:0] {
     J_FORMAT = 0,
@@ -704,7 +704,7 @@ package riscv_instr_pkg;
     VLS_FORMAT,
     VSS_FORMAT,
     VAMO_FORMAT
-  } riscv_instr_format_t;
+  } riscv_instr_format_t;     //  指令类型
 
 
   // Vector arithmetic instruction variant
@@ -722,7 +722,7 @@ package riscv_instr_pkg;
     VFM,
     VS,
     VM
-  } va_variant_t;
+  } va_variant_t;           //  向量算术指令的变体
 
   typedef enum bit [5:0] {
     LOAD = 0,
@@ -742,7 +742,7 @@ package riscv_instr_pkg;
     INTERRUPT,
     `VECTOR_INCLUDE("riscv_instr_pkg_inc_riscv_instr_category_t.sv")
     AMO // (last one)
-  } riscv_instr_category_t;
+  } riscv_instr_category_t;      //   指令的分类
 
   typedef bit [11:0] riscv_csr_t;
 
@@ -1098,7 +1098,7 @@ package riscv_instr_pkg;
     VL              = 'hC20,  // Vector length
     VTYPE           = 'hC21,  // Vector data type register
     VLENB           = 'hC22   // VLEN/8 (vector register length in bytes)
-  } privileged_reg_t;
+  } privileged_reg_t;       //   特权寄存器
 
   typedef enum bit [5:0] {
     RSVD,       // Reserved field
@@ -1107,32 +1107,32 @@ package riscv_instr_pkg;
     MODE,       // satp.mode
     ASID,       // satp.asid
     PPN         // satp.ppn
-  } privileged_reg_fld_t;
+  } privileged_reg_fld_t;          //   特权寄存器的字段,用于表示特定的状态或控制信息
 
   typedef enum bit [1:0] {
     M_LEVEL = 2'b11,  // Machine mode
     S_LEVEL = 2'b01,  // Supervisor mode
     U_LEVEL = 2'b00   // User mode
-  } privileged_level_t;
+  } privileged_level_t;             //   三种特权模式
 
   typedef enum bit [1:0] {
-    WPRI, // Reserved Writes Preserve Values, Reads Ignore Value
-    WLRL, // Write/Read Only Legal Values
-    WARL  // Write Any Values, Reads Legal Values
+    WPRI, // Reserved Writes Preserve Values, Reads Ignore Value    读取寄存器字段的值
+    WLRL, // Write/Read Only Legal Values       向寄存器字段写入值
+    WARL  // Write Any Values, Reads Legal Values       修改寄存器字段的值，通常是通过位操作来更新特定位上的值
   } reg_field_access_t;
 
   //Pseudo instructions
   typedef enum bit [7:0] {
     LI = 0,
     LA
-  } riscv_pseudo_instr_name_t;
+  } riscv_pseudo_instr_name_t;        //  伪指令的名称
 
   // Data pattern of the memory model
   typedef enum bit [1:0] {
     RAND_DATA = 0,
     ALL_ZERO,
     INCR_VAL
-  } data_pattern_t;
+  } data_pattern_t;            //  表示不同的数据模式或数据状态
 
   typedef enum bit [2:0] {
     NEXT_LEVEL_PAGE   = 3'b000, // Pointer to next level of page table.
@@ -1141,7 +1141,7 @@ package riscv_instr_pkg;
     EXECUTE_ONLY_PAGE = 3'b100, // Execute-only page.
     READ_EXECUTE_PAGE = 3'b101, // Read-execute page.
     R_W_EXECUTE_PAGE  = 3'b111  // Read-write-execute page
-  } pte_permission_t;
+  } pte_permission_t;        //  页表条目（Page Table Entry，PTE）权限
 
   typedef enum bit [3:0] {
     U_SOFTWARE_INTR  = 4'h0,
@@ -1153,7 +1153,7 @@ package riscv_instr_pkg;
     U_EXTERNAL_INTR  = 4'h8,
     S_EXTERNAL_INTR  = 4'h9,
     M_EXTERNAL_INTR  = 4'hB
-  } interrupt_cause_t;
+  } interrupt_cause_t;       //     中断原因的枚举类型
 
   typedef enum bit [3:0] {
     INSTRUCTION_ADDRESS_MISALIGNED = 4'h0,
@@ -1170,7 +1170,7 @@ package riscv_instr_pkg;
     INSTRUCTION_PAGE_FAULT         = 4'hC,
     LOAD_PAGE_FAULT                = 4'hD,
     STORE_AMO_PAGE_FAULT           = 4'hF
-  } exception_cause_t;
+  } exception_cause_t;      //      异常原因的枚举类型
 
   typedef enum int {
     MISA_EXT_A = 0,
@@ -1199,14 +1199,14 @@ package riscv_instr_pkg;
     MISA_EXT_X,
     MISA_EXT_Y,
     MISA_EXT_Z
-  } misa_ext_t;
+  } misa_ext_t;                //   扩展指令集的枚举类型
 
   typedef enum bit [1:0] {
     NO_HAZARD,
     RAW_HAZARD,
     WAR_HAZARD,
     WAW_HAZARD
-  } hazard_e;
+  } hazard_e;                 //    潜在的危险或错误的枚举类型
 
   riscv_csr_t default_include_csr_write[$] = {MSCRATCH};
 
@@ -1225,7 +1225,7 @@ package riscv_instr_pkg;
     TOR   = 2'b01,
     NA4   = 2'b10,
     NAPOT = 2'b11
-  } pmp_addr_mode_t;
+  } pmp_addr_mode_t;          //   物理内存保护
 
   // PMP configuration register layout
   // This configuration struct includes the pmp address for simplicity
@@ -1271,11 +1271,11 @@ package riscv_instr_pkg;
     end else begin
       return $sformatf("h%0d_", hart);
     end
-  endfunction : hart_prefix
+  endfunction : hart_prefix    //  多线程前缀添加
 
   function automatic string get_label(string label, int hart = 0);
     return {hart_prefix(hart), label};
-  endfunction : get_label
+  endfunction : get_label    //  前缀添加
 
   typedef struct packed {
     bit ill;
@@ -1284,14 +1284,14 @@ package riscv_instr_pkg;
     int vediv;
     int vsew;
     int vlmul;
-  } vtype_t;
+  } vtype_t;                  //  向量类型配置
 
   typedef enum bit [1:0] {
     RoundToNearestUp,
     RoundToNearestEven,
     RoundDown,
     RoundToOdd
-  } vxrm_t;
+  } vxrm_t;                  //   浮点舍入
 
   typedef enum int {
     ZBA,
@@ -1305,7 +1305,7 @@ package riscv_instr_pkg;
     ZBM,
     ZBT,
     ZB_TMP // for uncategorized instructions
-  } b_ext_group_t;
+  } b_ext_group_t;              //  扩展指令组
 
   `VECTOR_INCLUDE("riscv_instr_pkg_inc_variables.sv")
 
@@ -1333,17 +1333,17 @@ package riscv_instr_pkg;
   string indent = {LABEL_STR_LEN{" "}};
 
   // Format the string to a fixed length
-  function automatic string format_string(string str, int len = 10);
+ function automatic string format_string(string str, int len = 10);   //  返回的字符串长度至少为10
     string formatted_str;
     formatted_str = {len{" "}};
     if(len < str.len()) return str;
     formatted_str = {str, formatted_str.substr(0, len - str.len() - 1)};
     return formatted_str;
-  endfunction
+  endfunction   
 
   // Print the data in the following format
   // 0xabcd, 0x1234, 0x3334 ...
-  function automatic string format_data(bit [7:0] data[], int unsigned byte_per_group = 4);
+ function automatic string format_data(bit [7:0] data[], int unsigned byte_per_group = 4);     //  把传进来的数据弄成 0xabcd, 0x1234, 0x3334  应该是PC值
     string str;
     int cnt;
     str = "0x";
@@ -1360,7 +1360,7 @@ package riscv_instr_pkg;
   function automatic riscv_instr_name_t get_instr_name(string str);
     riscv_instr_name_t instr = instr.first;
     forever begin
-      if(str.toupper() == instr.name()) begin
+      if(str.toupper() == instr.name()) begin   //  将传入的字符串转换成大写，然后在枚举中遍历查找
         return instr;
       end
       if(instr == instr.last) begin
@@ -1370,7 +1370,7 @@ package riscv_instr_pkg;
     end
   endfunction
 
-  // Push general purpose register to stack, this is needed before trap handling
+  // Push general purpose register to stack, this is needed before trap handling   将通用寄存器的值推入堆栈，这是在处理trap（陷阱）等操作的必备步骤
   function automatic void push_gpr_to_kernel_stack(privileged_reg_t status,
                                                    privileged_reg_t scratch,
                                                    bit mprv,
@@ -1416,7 +1416,7 @@ package riscv_instr_pkg;
   endfunction
 
   // Pop general purpose register from stack, this is needed before returning to user program
-  function automatic void pop_gpr_from_kernel_stack(privileged_reg_t status,
+  function automatic void pop_gpr_from_kernel_stack(privileged_reg_t status,             //   从堆栈中拿出数据
                                                     privileged_reg_t scratch,
                                                     bit mprv,
                                                     riscv_reg_t sp,
@@ -1440,22 +1440,22 @@ package riscv_instr_pkg;
   endfunction
 
   // Get an integer argument from comand line
-  function automatic void get_int_arg_value(string cmdline_str, ref int val);
+  function automatic void get_int_arg_value(string cmdline_str, ref int val);       //从命令行字符串中获取一个整数参数值
     string s;
     if(inst.get_arg_value(cmdline_str, s)) begin
-      val = s.atoi();
+      val = s.atoi();        //  字符串 s 转换为整数
     end
   endfunction
 
-  // Get a bool argument from comand line
-  function automatic void get_bool_arg_value(string cmdline_str, ref bit val);
+  // Get a bool argument from comand line               从命令行获取一个bool型变量
+  function automatic void get_bool_arg_value(string cmdline_str, ref bit val); 
     string s;
     if(inst.get_arg_value(cmdline_str, s)) begin
       val = s.atobin();
     end
   endfunction
 
-  // Get a hex argument from command line
+  // Get a hex argument from command line               从命令行获取一个十六进制型变量
   function automatic void get_hex_arg_value(string cmdline_str,
                                             ref bit [XLEN - 1 : 0] val);
     string s;
@@ -1464,7 +1464,7 @@ package riscv_instr_pkg;
     end
   endfunction
 
-  class cmdline_enum_processor #(parameter type T = riscv_instr_group_t);
+    class cmdline_enum_processor #(parameter type T = riscv_instr_group_t);    // 处理命令行中的枚举类型
     static function void get_array_values(string cmdline_str, bit allow_raw_vals, ref T vals[]);
       string s;
       void'(inst.get_arg_value(cmdline_str, s));
@@ -1496,14 +1496,14 @@ package riscv_instr_pkg;
                            A1, A2, A3, A4, A5, A6, A7, S2, S3, S4, S5, S6,
                            S7, S8, S9, S10, S11, T3, T4, T5, T6};
 
-  riscv_reg_t compressed_gpr[] = {S0, S1, A0, A1, A2, A3, A4, A5};
+    riscv_reg_t compressed_gpr[] = {S0, S1, A0, A1, A2, A3, A4, A5};    // 压缩指令集的寄存器
 
-  riscv_instr_category_t all_categories[] = {
+    riscv_instr_category_t all_categories[] = {             //   指令的分类
     LOAD, STORE, SHIFT, ARITHMETIC, LOGICAL, COMPARE, BRANCH, JUMP,
     SYNCH, SYSTEM, COUNTER, CSR, CHANGELEVEL, TRAP, INTERRUPT, AMO
   };
 
-  function automatic void get_val(input string str, output bit [XLEN-1:0] val, input hex = 0);
+  function automatic void get_val(input string str, output bit [XLEN-1:0] val, input hex = 0);     // 把一个str按 hex的参数解析成 十六进制或者十进制
     if (str.len() > 2) begin
       if (str.substr(0, 1) == "0x") begin
         str = str.substr(2, str.len() -1);
